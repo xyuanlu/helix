@@ -146,8 +146,8 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
         // set parent node
         ZNRecord metaRecord = new ZNRecord(value.getId());
         metaRecord.setSimpleFields(value.getRecord().getSimpleFields());
-        success = _baseDataAccessor.set(path, metaRecord, options);
-        if (success) {
+        //success = _baseDataAccessor.set(path, metaRecord, options);
+        //if (success) {
           ZNRecordBucketizer bucketizer = new ZNRecordBucketizer(value.getBucketSize());
 
           Map<String, ZNRecord> map = bucketizer.bucketize(value.getRecord());
@@ -160,7 +160,9 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
 
           // TODO: set success accordingly
           _baseDataAccessor.setChildren(paths, bucketizedRecords, options);
-        }
+
+          success = _baseDataAccessor.set(path, metaRecord, options);
+        //}
       } else {
         success = _baseDataAccessor.set(path, value.getRecord(), options);
       }
@@ -569,15 +571,13 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
       }
     }
 
-    // set non-bucketized nodes or parent nodes of bucketized nodes
-    boolean success[] = _baseDataAccessor.setChildren(paths, records, options);
-
     // set bucketized nodes
     List<String> allBucketizedPaths = new ArrayList<String>();
     List<ZNRecord> allBucketizedRecords = new ArrayList<ZNRecord>();
 
+    boolean success[];
     for (int i = 0; i < keys.size(); i++) {
-      if (success[i] && bucketizedPaths.get(i) != null) {
+      if (/*success[i] && */bucketizedPaths.get(i) != null) {
         allBucketizedPaths.addAll(bucketizedPaths.get(i));
         allBucketizedRecords.addAll(bucketizedRecords.get(i));
       }
@@ -585,6 +585,9 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
 
     // TODO: set success accordingly
     _baseDataAccessor.setChildren(allBucketizedPaths, allBucketizedRecords, options);
+
+    // set non-bucketized nodes or parent nodes of bucketized nodes
+    success = _baseDataAccessor.setChildren(paths, records, options);
 
     return success;
   }

@@ -381,9 +381,7 @@ public class ParticipantManager {
           metaRecord.setSimpleFields(lastCurState.getRecord().getSimpleFields());
           DataUpdater<ZNRecord> metaRecordUpdater =
               new CurStateCarryOverUpdater(_sessionId, initState, new CurrentState(metaRecord));
-          boolean success =
-              baseAccessor.update(curStatePath, metaRecordUpdater, AccessOption.PERSISTENT);
-          if (success) {
+          //boolean success = true;
             // update current state buckets
             ZNRecordBucketizer bucketizer = new ZNRecordBucketizer(lastCurState.getBucketSize());
 
@@ -394,9 +392,9 @@ public class ParticipantManager {
               paths.add(curStatePath + "/" + bucketName);
               updaters.add(new CurStateCarryOverUpdater(_sessionId, initState, new CurrentState(map
                   .get(bucketName))));
-            }
-
             baseAccessor.updateChildren(paths, updaters, AccessOption.PERSISTENT);
+            // update root
+            baseAccessor.update(curStatePath, metaRecordUpdater, AccessOption.PERSISTENT);
           }
 
         } else {

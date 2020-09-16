@@ -21,6 +21,7 @@ package org.apache.helix.messaging.handling;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -28,11 +29,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixDefinedState;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixProperty;
 import org.apache.helix.HelixRollbackException;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.NotificationContext.MapKey;
@@ -50,6 +53,8 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelParser;
 import org.apache.helix.participant.statemachine.StateTransitionError;
 import org.apache.helix.util.StatusUpdateUtil;
+import org.apache.helix.zookeeper.datamodel.ZNRecordUpdater;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -164,6 +169,15 @@ public class HelixStateTransitionHandler extends MessageHandler {
       if (!accessor.updateProperty(key, currStateUpdate)) {
         logger.error("Fails to persist current state back to ZK for resource " + resource
             + " partition: " + partitionName);
+      }
+      if (_message.getBucketSize()>0) {
+        PropertyKey rootKey = accessor.keyBuilder().currentState(instance, sessionId, resource);
+        // touch root node
+        ZNRecord record = null;
+        Stat stat = new Stat();
+        record = accessor.getBaseDataAccessor().get(rootKey.getPath(), stat, AccessOption.EPHEMERAL);
+        accessor.getBaseDataAccessor().update(rootKey.getPath(), new ZNRecordUpdater(record), AccessOption.EPHEMERAL);
+
       }
     } catch (Exception e) {
       logger.error("Error when removing " + CurrentState.CurrentStateProperty.REQUESTED_STATE.name()
@@ -283,6 +297,16 @@ public class HelixStateTransitionHandler extends MessageHandler {
           throw new HelixException("Fails to persist current state back to ZK for resource "
               + resource + " partition: " + _message.getPartitionName());
         }
+        if (_message.getBucketSize()>0) {
+          PropertyKey rootKey = accessor.keyBuilder().currentState(instanceName, sessionId, resource);
+          // touch root node
+          ZNRecord record = null;
+          Stat stat = new Stat();
+          record = accessor.getBaseDataAccessor().get(rootKey.getPath(), stat, AccessOption.EPHEMERAL);
+          accessor.getBaseDataAccessor().update(rootKey.getPath(), new ZNRecordUpdater(record), AccessOption.EPHEMERAL);
+
+        }
+
       } else {
         // sub-message of a batch message
         ConcurrentHashMap<String, CurrentStateUpdate> csUpdateMap =

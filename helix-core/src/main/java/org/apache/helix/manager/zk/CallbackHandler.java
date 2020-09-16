@@ -625,13 +625,10 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
                 String childPath = path + "/" + record.getId();
 
                 int bucketSize = property.getBucketSize();
-                if (bucketSize > 0) {
-                  // subscribe both data-change and child-change on bucketized parent node
-                  // data-change gives a delete-callback which is used to remove watch
+                /*if (bucketSize > 0) {
                   subscribeChildChange(childPath, callbackType);
                   subscribeDataChange(childPath, callbackType);
 
-                  // subscribe data-change on bucketized child
                   List<String> bucketizedChildNames = _zkClient.getChildren(childPath);
                   if (bucketizedChildNames != null) {
                     for (String bucketizedChildName : bucketizedChildNames) {
@@ -639,10 +636,11 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
                       subscribeDataChange(bucketizedChildPath, callbackType);
                     }
                   }
-                } else {
+                } else {*/
                   subscribeDataChange(childPath, callbackType);
-                }
+                //}
               }
+
               break;
             }
             default: {
