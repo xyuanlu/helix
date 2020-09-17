@@ -297,6 +297,7 @@ public class HelixStateTransitionHandler extends MessageHandler {
           throw new HelixException("Fails to persist current state back to ZK for resource "
               + resource + " partition: " + _message.getPartitionName());
         }
+
         if (_message.getBucketSize()>0) {
           PropertyKey rootKey = accessor.keyBuilder().currentState(instanceName, sessionId, resource);
           // touch root node
