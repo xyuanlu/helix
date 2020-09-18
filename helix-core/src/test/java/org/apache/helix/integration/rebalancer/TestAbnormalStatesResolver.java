@@ -109,6 +109,7 @@ public class TestAbnormalStatesResolver extends ZkStandAloneCMTestBase {
         MasterSlaveSMD.States.SLAVE.name(), MasterSlaveSMD.States.MASTER.name(), TEST_DB,
         slaveHost);
     msg.setStateModelDef(MasterSlaveSMD.name);
+    msg.setBucketSize(3);
 
     Criteria cr = new Criteria();
     cr.setInstanceName(slaveHost);

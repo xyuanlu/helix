@@ -56,6 +56,7 @@ public class TestMessagePartitionStateMismatch extends ZkStandAloneCMTestBase {
           boolean rand = new Random().nextInt(10) > 5;
           if (ev.getStateMap(partition).get(instanceName).equals("MASTER")) {
             message.setSrcName(manager.getInstanceName());
+            message.setBucketSize(3);
             message.setTgtName(instanceName);
             message.setMsgState(MessageState.NEW);
             message.setPartitionName(partition);
@@ -69,6 +70,7 @@ public class TestMessagePartitionStateMismatch extends ZkStandAloneCMTestBase {
           } else if (ev.getStateMap(partition).get(instanceName).equals("SLAVE")) {
             message.setSrcName(manager.getInstanceName());
             message.setTgtName(instanceName);
+            message.setBucketSize(3);
             message.setMsgState(MessageState.NEW);
             message.setPartitionName(partition);
             message.setResourceName(TEST_DB);
@@ -86,6 +88,6 @@ public class TestMessagePartitionStateMismatch extends ZkStandAloneCMTestBase {
     }
     Thread.sleep(3000);
     ExternalView ev2 = accessor.getProperty(kb.externalView(TEST_DB));
-    Assert.assertTrue(ev.equals(ev2));
+    Assert.assertEquals(ev, ev2);
   }
 }
