@@ -21,7 +21,6 @@ package org.apache.helix.messaging.handling;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -35,16 +34,11 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixDefinedState;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixProperty;
 import org.apache.helix.HelixRollbackException;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.NotificationContext.MapKey;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.datamodel.ZNRecordBucketizer;
-import org.apache.helix.zookeeper.datamodel.ZNRecordDelta;
-import org.apache.helix.zookeeper.datamodel.ZNRecordDelta.MergeOperation;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.Message.Attributes;
@@ -53,6 +47,10 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelParser;
 import org.apache.helix.participant.statemachine.StateTransitionError;
 import org.apache.helix.util.StatusUpdateUtil;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.datamodel.ZNRecordBucketizer;
+import org.apache.helix.zookeeper.datamodel.ZNRecordDelta;
+import org.apache.helix.zookeeper.datamodel.ZNRecordDelta.MergeOperation;
 import org.apache.helix.zookeeper.datamodel.ZNRecordUpdater;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -171,12 +169,9 @@ public class HelixStateTransitionHandler extends MessageHandler {
             + " partition: " + partitionName);
       }
       if (_message.getBucketSize()>0) {
-        PropertyKey rootKey = accessor.keyBuilder().currentState(instance, sessionId, resource);
         // touch root node
-        ZNRecord record = null;
-        Stat stat = new Stat();
-        record = accessor.getBaseDataAccessor().get(rootKey.getPath(), stat, AccessOption.EPHEMERAL);
-        accessor.getBaseDataAccessor().update(rootKey.getPath(), new ZNRecordUpdater(record), AccessOption.EPHEMERAL);
+        touchRootNodeForBucketizedCurrentState(
+            accessor.keyBuilder().currentState(instance, sessionId, resource));
 
       }
     } catch (Exception e) {
@@ -299,13 +294,9 @@ public class HelixStateTransitionHandler extends MessageHandler {
         }
 
         if (_message.getBucketSize()>0) {
-          PropertyKey rootKey = accessor.keyBuilder().currentState(instanceName, sessionId, resource);
           // touch root node
-          ZNRecord record = null;
-          Stat stat = new Stat();
-          record = accessor.getBaseDataAccessor().get(rootKey.getPath(), stat, AccessOption.EPHEMERAL);
-          accessor.getBaseDataAccessor().update(rootKey.getPath(), new ZNRecordUpdater(record), AccessOption.EPHEMERAL);
-
+          touchRootNodeForBucketizedCurrentState(
+              accessor.keyBuilder().currentState(instanceName, sessionId, resource));
         }
 
       } else {
@@ -335,7 +326,16 @@ public class HelixStateTransitionHandler extends MessageHandler {
         Arrays.asList(partitionName));
     logger.info("error in transit from ERROR to " + _message.getToState() + " for partition: "
         + partitionName + ". disable it on " + instanceName);
+  }
 
+  private void touchRootNodeForBucketizedCurrentState(PropertyKey rootKey) {
+    // touch root node
+    Stat stat = new Stat();
+    HelixDataAccessor accessor = _manager.getHelixDataAccessor();
+    int options =
+        rootKey.getType().isPersistent() ? AccessOption.PERSISTENT : AccessOption.EPHEMERAL;
+    ZNRecord record = accessor.getBaseDataAccessor().get(rootKey.getPath(), stat, options);
+    accessor.getBaseDataAccessor().update(rootKey.getPath(), new ZNRecordUpdater(record), options);
   }
 
   @Override
