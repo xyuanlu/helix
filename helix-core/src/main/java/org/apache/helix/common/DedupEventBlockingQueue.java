@@ -38,6 +38,7 @@ import com.google.common.collect.Maps;
 public class DedupEventBlockingQueue<T, E> {
   private final Map<T, Entry<T, E>> _eventMap;
   private final Queue<Entry> _eventQueue;
+  Boolean _touched = false;
 
   class Entry <T, E> {
     private T _type;
@@ -69,6 +70,7 @@ public class DedupEventBlockingQueue<T, E> {
    * Remove all events from the queue
    */
   public synchronized void clear() {
+    _touched = false;
     _eventMap.clear();
     _eventQueue.clear();
   }
@@ -82,6 +84,7 @@ public class DedupEventBlockingQueue<T, E> {
     if (!_eventMap.containsKey(entry.getType())) {
       // only insert to the queue if there isn't a same-typed event already present
       boolean result = _eventQueue.offer(entry);
+      _touched = false;
       if (!result) {
         return;
       }
@@ -104,6 +107,7 @@ public class DedupEventBlockingQueue<T, E> {
     Entry entry = _eventQueue.poll();
     if (entry != null) {
       entry = _eventMap.remove(entry.getType());
+      _touched = false;
       return (E) entry.getEvent();
     }
     return null;
@@ -116,8 +120,21 @@ public class DedupEventBlockingQueue<T, E> {
   public synchronized E peek() {
     Entry entry = _eventQueue.peek();
     if (entry != null) {
+      _touched = true;
       entry = _eventMap.get(entry.getType());
       return (E) entry.getEvent();
+    }
+    return null;
+  }
+
+  public synchronized E peekUntouchedElement() {
+    if (!_touched) {
+      Entry entry = _eventQueue.peek();
+      _touched = true;
+      if (entry != null) {
+        entry = _eventMap.get(entry.getType());
+        return (E) entry.getEvent();
+      }
     }
     return null;
   }
@@ -136,5 +153,9 @@ public class DedupEventBlockingQueue<T, E> {
    */
   public boolean isEmpty() {
     return _eventQueue.isEmpty();
+  }
+
+  public boolean touched() {
+    return _touched;
   }
 }

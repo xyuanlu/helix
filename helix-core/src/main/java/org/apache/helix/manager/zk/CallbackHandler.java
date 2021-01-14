@@ -170,13 +170,10 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
     public void run() {
       NotificationContext event = null;
       try {
-        synchronized (_callBackEventQueue) {
-          if (_callBackEventQueue.size() > 0) {
-            event = _callBackEventQueue.take();
-          }
-        }
+        event = _callBackEventQueue.peekUntouchedElement();
         if (event != null) {
           handleEvent(event);
+          _callBackEventQueue.take();
         }
       } catch (InterruptedException e) {
         e.printStackTrace();
@@ -189,7 +186,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
       }
 
       synchronized (_callBackEventQueue) {
-        if (_callBackEventQueue.size() > 0) {
+        if (_callBackEventQueue.size() > 0 && !_callBackEventQueue.touched()) {
           submitHandleCallBackEventToManagerThreadPool();
         }
       }
@@ -354,14 +351,14 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
   public void queueEvent(NotificationContext.Type eventType, NotificationContext event) {
     synchronized (_callBackEventQueue) {
       _callBackEventQueue.put(eventType, event);
-      if (_callBackEventQueue.size() == 1) {
+      if (_callBackEventQueue.size() == 1 && !_callBackEventQueue.touched()) {
         _futureCallBackProcessEvent = _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this));
       }
     }
   }
 
   private void submitHandleCallBackEventToManagerThreadPool() {
-    if (_callBackEventQueue.size() !=0) {
+    if (_callBackEventQueue.size() !=0 ) {
       _futureCallBackProcessEvent = _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this));
     }
   }
