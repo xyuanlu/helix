@@ -354,7 +354,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
 
   private void submitHandleCallBackEventToManagerThreadPool() {
     synchronized (_callBackEventQueue) {
-      if (_callBackEventQueue.size() != 0  && (_futureCallBackProcessEvent==null || _futureCallBackProcessEvent.isDone())) {
+      if (_callBackEventQueue.size() != 0 ) {
         try {
           NotificationContext event = _callBackEventQueue.take();
           _futureCallBackProcessEvent =
