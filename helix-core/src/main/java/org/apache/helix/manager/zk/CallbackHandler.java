@@ -146,21 +146,23 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
   private boolean _ready = false;
 
   private DedupEventBlockingQueue<Type, NotificationContext> _callBackEventQueue;
-  private Future _futureCallBackProcessEvent;
+  private Future _futureCallBackProcessEvent = null;
 
   class CallbackProcessor implements Runnable {
     private CallbackHandler _handler;
     protected String _processorName;
+    NotificationContext _event;
 
-    public CallbackProcessor(CallbackHandler handler) {
+    public CallbackProcessor(CallbackHandler handler, NotificationContext event) {
       _processorName = _manager.getClusterName() +
           "CallbackProcessor@" + Integer.toHexString(handler.hashCode());
       _handler = handler;
+      _event = event;
     }
 
-      protected void handleEvent(NotificationContext event) {
+      protected void handleEvent() {
       try {
-        _handler.invoke(event);
+        _handler.invoke(_event);
       } catch (Exception e) {
         logger.warn("Exception in callback processing thread. Skipping callback", e);
       }
@@ -168,18 +170,8 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
 
     @Override
     public void run() {
-      NotificationContext event = null;
       try {
-        synchronized (_callBackEventQueue) {
-          if (_callBackEventQueue.size() > 0) {
-            event = _callBackEventQueue.take();
-          }
-        }
-        if (event != null) {
-          handleEvent(event);
-        }
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+        handleEvent();
       } catch (ZkInterruptedException e) {
         logger.warn(_processorName + " thread caught a ZK connection interrupt", e);
       } catch (ThreadDeath death) {
@@ -354,15 +346,23 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
   public void queueEvent(NotificationContext.Type eventType, NotificationContext event) {
     synchronized (_callBackEventQueue) {
       _callBackEventQueue.put(eventType, event);
-      if (_callBackEventQueue.size() == 1) {
-        _futureCallBackProcessEvent = _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this));
+      if (_callBackEventQueue.size() == 1 && (_futureCallBackProcessEvent==null || _futureCallBackProcessEvent.isDone())) {
+        _futureCallBackProcessEvent = _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this, event));
       }
     }
   }
 
   private void submitHandleCallBackEventToManagerThreadPool() {
-    if (_callBackEventQueue.size() !=0) {
-      _futureCallBackProcessEvent = _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this));
+    synchronized (_callBackEventQueue) {
+      if (_callBackEventQueue.size() != 0 && (_futureCallBackProcessEvent==null || _futureCallBackProcessEvent.isDone())) {
+        try {
+          NotificationContext event = _callBackEventQueue.take();
+          _futureCallBackProcessEvent =
+              _manager.submitHandleCallBackEventToThreadPool(new CallbackProcessor(this, event));
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
     }
   }
 
