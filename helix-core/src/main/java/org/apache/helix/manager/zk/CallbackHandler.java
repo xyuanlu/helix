@@ -133,7 +133,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
   private final AtomicLong _lastNotificationTimeStamp;
   private final HelixManager _manager;
   private final PropertyKey _propertyKey;
-  private boolean _batchModeEnabled = false;
+  private boolean _batchModeEnabled = true;
   private boolean _preFetchEnabled = true;
   private HelixCallbackMonitor _monitor;
 
@@ -715,6 +715,11 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
 
     if (_batchModeEnabled) {
       _callBackEventQueue.clear();
+      synchronized (_callBackEventQueue) {
+        if (_futureCallBackProcessEvent != null) {
+          _futureCallBackProcessEvent.cancel(false);
+        }
+      }
       /*
       CallbackProcessor callbackProcessor = _batchCallbackProcessorRef.get();
       if (callbackProcessor != null) {
