@@ -29,9 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Timer;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -40,7 +38,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.JMException;
 
 import com.google.common.collect.Sets;
-import jdk.nashorn.internal.codegen.CompilerConstants;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.ConfigAccessor;
@@ -135,7 +132,7 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
 
   class CallBackHandlerThreadExecutor extends ThreadPoolExecutor {
     public CallBackHandlerThreadExecutor(int PoolSize) {
-      super(PoolSize, PoolSize, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+      super(PoolSize, PoolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
     }
 
     @Override
