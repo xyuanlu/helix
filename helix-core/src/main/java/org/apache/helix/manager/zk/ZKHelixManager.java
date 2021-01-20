@@ -29,14 +29,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Timer;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.JMException;
 
 import com.google.common.collect.Sets;
+import jdk.nashorn.internal.codegen.CompilerConstants;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.ConfigAccessor;
@@ -129,7 +133,20 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
   private final HelixManagerProperty _helixManagerProperty;
   private final HelixManagerStateListener _stateListener;
 
-  /**
+  class CallBackHandlerThreadExecutor extends ThreadPoolExecutor {
+    public CallBackHandlerThreadExecutor(int PoolSize) {
+      super(PoolSize, PoolSize, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    }
+
+    @Override
+    protected void afterExecute(Runnable r, Throwable t) {
+      super.afterExecute(r, t);
+      if (r instanceof CallbackHandler.CallbackProcessor){
+        ((CallbackHandler.CallbackProcessor) r ).submitNextEventToManagerTP();
+      }
+    }
+  }
+    /**
    * helix version#
    */
   private final String _version;
@@ -255,7 +272,7 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
         Sets.newHashSet(Pipeline.Type.DEFAULT, Pipeline.Type.TASK);
     _preConnectCallbacks = new ArrayList<>();
     _handlers = new ArrayList<>();
-    _callbackHandlerExecutorService = Executors.newScheduledThreadPool(10);
+    _callbackHandlerExecutorService = new CallBackHandlerThreadExecutor(10);
     _properties = new HelixManagerProperties(SystemPropertyKeys.CLUSTER_MANAGER_VERSION);
     _version = _properties.getVersion();
 

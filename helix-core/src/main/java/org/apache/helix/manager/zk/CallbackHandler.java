@@ -179,12 +179,15 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
       } catch (Throwable t) {
         logger.error(_processorName + " thread failed while running " + _processorName, t);
       }
+    }
 
+    public void submitNextEventToManagerTP() {
       synchronized (_callBackEventQueue) {
         if (_callBackEventQueue.size() > 0) {
           submitHandleCallBackEventToManagerThreadPool();
         }
       }
+
     }
   }
 
