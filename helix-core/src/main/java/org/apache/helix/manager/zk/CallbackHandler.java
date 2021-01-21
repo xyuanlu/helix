@@ -356,7 +356,6 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
   }
 
   private void submitHandleCallBackEventToManagerThreadPool() {
-    synchronized (_callBackEventQueue) {
       if (_callBackEventQueue.size() != 0 && (_futureCallBackProcessEvent==null || _futureCallBackProcessEvent.isDone() )) {
         try {
           NotificationContext event = _callBackEventQueue.take();
@@ -366,7 +365,6 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
           e.printStackTrace();
         }
       }
-    }
   }
 
   public void enqueueTask(NotificationContext changeContext) throws Exception {
