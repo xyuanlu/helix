@@ -247,6 +247,7 @@ public class ZKHelixManager implements HelixManager, IZkStateListener {
     }
 
     _instanceName = instanceName;
+
     _enabledPipelineTypes =
         Sets.newHashSet(Pipeline.Type.DEFAULT, Pipeline.Type.TASK);
     _preConnectCallbacks = new ArrayList<>();
