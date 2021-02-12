@@ -53,6 +53,7 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
 
   private static final int N = 2;
   private static final int PARTITION_NUM = 1;
+  private static final long TIMEOUT = 180 * 1000L;
 
   class DummyCallback implements CustomCodeCallbackHandler {
     private final Map<NotificationContext.Type, Boolean> _callbackInvokeMap = new HashMap<>();
@@ -195,13 +196,27 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
     fakeInstance.setSessionId("fakeSessionId");
     fakeInstance.setHelixVersion("0.6");
     accessor.setProperty(keyBuilder.liveInstance(fakeInstanceName), fakeInstance);
-    Thread.sleep(1000);
 
     for (Map.Entry<String, DummyCallback> e : callbacks.entrySet()) {
       String instance = e.getKey();
       DummyCallback callback = e.getValue();
-      Assert.assertFalse(callback.isInitTypeInvoked());
-      Assert.assertFalse(callback.isCallbackTypeInvoked());
+      boolean res = TestHelper.verify(() -> {
+        try {
+          return !callback.isInitTypeInvoked();
+        } catch (Exception exp) {
+          return false;
+        }
+      }, TIMEOUT);
+      Assert.assertTrue(res);
+
+      res = TestHelper.verify(() -> {
+        try {
+          return !callback.isCallbackTypeInvoked();
+        } catch (Exception exp) {
+          return false;
+        }
+      }, TIMEOUT);
+      Assert.assertTrue(res);
 
       // Ensure that we were told that a leader stopped being the leader
       if (instance.equals(leader)) {
@@ -240,13 +255,27 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
 
     // Add a fake instance should invoke custom-code runner
     accessor.setProperty(keyBuilder.liveInstance(fakeInstanceName), fakeInstance);
-    Thread.sleep(1000);
     for (String instance : callbacks.keySet()) {
       DummyCallback callback = callbacks.get(instance);
       if (instance.equals(leader)) {
-        Assert.assertTrue(callback.isCallbackTypeInvoked());
+        boolean res = TestHelper.verify(() -> {
+          try {
+            return callback.isCallbackTypeInvoked();
+          } catch (Exception exp) {
+            return false;
+          }
+        }, TIMEOUT);
+        Assert.assertTrue(res);
+
       } else {
-        Assert.assertFalse(callback.isCallbackTypeInvoked());
+        boolean res = TestHelper.verify(() -> {
+          try {
+            return !callback.isCallbackTypeInvoked();
+          } catch (Exception exp) {
+            return false;
+          }
+        }, TIMEOUT);
+        Assert.assertTrue(res);
       }
     }
 
