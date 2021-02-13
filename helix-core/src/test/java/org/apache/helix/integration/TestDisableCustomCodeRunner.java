@@ -246,9 +246,23 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
     for (String instance : callbacks.keySet()) {
       DummyCallback callback = callbacks.get(instance);
       if (instance.equals(leader)) {
-        Assert.assertTrue(callback.isInitTypeInvoked());
+        boolean res = TestHelper.verify(() -> {
+          try {
+            return callback.isInitTypeInvoked();
+          } catch (Exception exp) {
+            return false;
+          }
+        }, TIMEOUT);
+        Assert.assertTrue(res);
       } else {
-        Assert.assertFalse(callback.isInitTypeInvoked());
+        boolean res = TestHelper.verify(() -> {
+          try {
+            return !callback.isInitTypeInvoked();
+          } catch (Exception exp) {
+            return false;
+          }
+        }, TIMEOUT);
+        Assert.assertTrue(res);
       }
       callback.reset();
     }
