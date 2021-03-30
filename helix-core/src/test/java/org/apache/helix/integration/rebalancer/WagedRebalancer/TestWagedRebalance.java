@@ -722,7 +722,6 @@ public class TestWagedRebalance extends ZkTestBase {
     for (String db : _allDBs) {
       _gSetupTool.dropResourceFromCluster(CLUSTER_NAME, db);
     }
-    _allDBs.clear();
     // waiting for all DB be dropped.
     ZkHelixClusterVerifier _clusterVerifier =
         new StrictMatchExternalViewVerifier.Builder(CLUSTER_NAME).setZkAddr(ZK_ADDR)
@@ -731,6 +730,7 @@ public class TestWagedRebalance extends ZkTestBase {
             .build();
     try {
       Assert.assertTrue(_clusterVerifier.verifyByPolling());
+      _allDBs.clear();
     } finally {
       _clusterVerifier.close();
     }
