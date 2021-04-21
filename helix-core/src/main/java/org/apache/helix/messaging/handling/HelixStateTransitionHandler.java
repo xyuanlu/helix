@@ -62,7 +62,6 @@ public class HelixStateTransitionHandler extends MessageHandler {
     }
   }
 
-
   /**
    * If current state == toState in message, this is considered as Duplicated state transition
    */
