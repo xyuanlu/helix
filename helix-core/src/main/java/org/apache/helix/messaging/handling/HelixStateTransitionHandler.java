@@ -55,7 +55,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecordDelta.MergeOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class HelixStateTransitionHandler extends MessageHandler {
   public static class HelixStateMismatchException extends Exception {
     public HelixStateMismatchException(String info) {
