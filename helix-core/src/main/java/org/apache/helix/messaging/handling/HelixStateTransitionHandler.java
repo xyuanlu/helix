@@ -59,7 +59,6 @@ public class HelixStateTransitionHandler extends MessageHandler {
   public static class HelixStateMismatchException extends Exception {
     public HelixStateMismatchException(String info) {
       super(info);
-
     }
   }
 
