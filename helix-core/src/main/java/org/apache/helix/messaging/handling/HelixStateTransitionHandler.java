@@ -374,6 +374,7 @@ public class HelixStateTransitionHandler extends MessageHandler {
     }
 
     return taskResult;
+
   }
 
   private void invoke(HelixManager manager, NotificationContext context, HelixTaskResult taskResult,
