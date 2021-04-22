@@ -31,9 +31,6 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.TestHelper;
-import org.apache.helix.tools.ClusterVerifiers.BestPossibleExternalViewVerifier;
-import org.apache.helix.tools.ClusterVerifiers.ZkHelixClusterVerifier;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.ZkUnitTestBase;
 import org.apache.helix.integration.manager.ClusterControllerManager;
 import org.apache.helix.integration.manager.MockParticipantManager;
@@ -45,7 +42,9 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.participant.CustomCodeCallbackHandler;
 import org.apache.helix.participant.HelixCustomCodeRunner;
-import org.apache.helix.tools.ClusterStateVerifier;
+import org.apache.helix.tools.ClusterVerifiers.BestPossibleExternalViewVerifier;
+import org.apache.helix.tools.ClusterVerifiers.ZkHelixClusterVerifier;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -56,26 +55,36 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
 
   class DummyCallback implements CustomCodeCallbackHandler {
     private final Map<NotificationContext.Type, Boolean> _callbackInvokeMap = new HashMap<>();
+    private String _instance;
+
+    DummyCallback(String instance) {
+      _instance = instance;
+    }
 
     @Override
     public void onCallback(NotificationContext context) {
       NotificationContext.Type type = context.getType();
+      System.out.println("[Xyy]" + type + " called by" + _instance);
       _callbackInvokeMap.put(type, Boolean.TRUE);
     }
 
     public void reset() {
+      System.out.println("[Xyy] reset called by" + _instance);
       _callbackInvokeMap.clear();
     }
 
     boolean isInitTypeInvoked() {
+      System.out.println("[Xyy] is INIT called by" + _instance);
       return _callbackInvokeMap.containsKey(NotificationContext.Type.INIT);
     }
 
     boolean isCallbackTypeInvoked() {
+      System.out.println("[Xyy] is CALLBACK called by" + _instance);
       return _callbackInvokeMap.containsKey(NotificationContext.Type.CALLBACK);
     }
 
     boolean isFinalizeTypeInvoked() {
+      System.out.println("[Xyy] is FINALIZE called by" + _instance);
       return _callbackInvokeMap.containsKey(NotificationContext.Type.FINALIZE);
     }
   }
@@ -113,7 +122,7 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
 
       customCodeRunners.put(instanceName,
           new HelixCustomCodeRunner(participants.get(instanceName), ZK_ADDR));
-      callbacks.put(instanceName, new DummyCallback());
+      callbacks.put(instanceName, new DummyCallback(instanceName));
 
       customCodeRunners.get(instanceName).invoke(callbacks.get(instanceName))
           .on(ChangeType.LIVE_INSTANCE).usingLeaderStandbyModel("TestParticLeader").start();
@@ -140,7 +149,8 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       String state = instanceStates.get(instance);
       if ("LEADER".equals(state)) {
         leader = instance;
-        break;
+        System.out.println("[Xyy] ---- 1 LEADER is : " + leader);
+        //break;
       }
     }
     Assert.assertNotNull(leader);
@@ -224,15 +234,18 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       String state = instanceStates.get(instance);
       if ("LEADER".equals(state)) {
         leader = instance;
-        break;
+        System.out.println("[Xyy] ---- 2 LEADER is : " + leader);
+        //break;
       }
     }
     Assert.assertNotNull(leader);
     for (String instance : callbacks.keySet()) {
       DummyCallback callback = callbacks.get(instance);
       if (instance.equals(leader)) {
+        System.out.println("leader: [Xyy] ----  isInitTypeInvoked is : " + instance);
         Assert.assertTrue(callback.isInitTypeInvoked());
       } else {
+        System.out.println("[Xyy] ----  isInitTypeInvoked is : " + instance);
         Assert.assertFalse(callback.isInitTypeInvoked());
       }
       callback.reset();
