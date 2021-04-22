@@ -164,7 +164,6 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       callback.reset();
     }
 
-
     // Disable custom-code runner resource
     HelixAdmin admin = new ZKHelixAdmin(_gZkClient);
     admin.enableResource(clusterName, customCodeRunnerResource, false);
