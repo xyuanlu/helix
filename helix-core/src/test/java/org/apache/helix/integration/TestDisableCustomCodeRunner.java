@@ -177,6 +177,7 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       if (extView1 == null) {
         return false;
       }
+
       Set<String> partitionSet = extView1.getPartitionSet();
       if (partitionSet == null || partitionSet.size() != PARTITION_NUM) {
         return false;
