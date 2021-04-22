@@ -313,7 +313,6 @@ public class HelixStateTransitionHandler extends MessageHandler {
 
   }
 
-
   @Override
   public HelixTaskResult handleMessage() {
     NotificationContext context = _notificationContext;
