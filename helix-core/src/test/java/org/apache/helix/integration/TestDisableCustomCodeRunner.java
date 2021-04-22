@@ -164,6 +164,7 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       callback.reset();
     }
 
+
     // Disable custom-code runner resource
     HelixAdmin admin = new ZKHelixAdmin(_gZkClient);
     admin.enableResource(clusterName, customCodeRunnerResource, false);
@@ -177,7 +178,6 @@ public class TestDisableCustomCodeRunner extends ZkUnitTestBase {
       if (extView1 == null) {
         return false;
       }
-
       Set<String> partitionSet = extView1.getPartitionSet();
       if (partitionSet == null || partitionSet.size() != PARTITION_NUM) {
         return false;
