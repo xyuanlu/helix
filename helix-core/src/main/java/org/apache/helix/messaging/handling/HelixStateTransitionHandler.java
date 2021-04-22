@@ -363,7 +363,6 @@ public class HelixStateTransitionHandler extends MessageHandler {
           taskResult.setException(e);
           taskResult.setInterrupted(e instanceof InterruptedException);
         }
-
       }
 
       taskResult.setCompleteTime(System.currentTimeMillis());
