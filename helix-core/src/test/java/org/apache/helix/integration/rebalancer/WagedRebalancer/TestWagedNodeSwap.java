@@ -63,7 +63,6 @@ public class TestWagedNodeSwap extends ZkTestBase {
       BuiltInStateModelDefinitions.LeaderStandby.name()
   };
 
-
   @BeforeClass
   public void beforeClass() throws Exception {
     _gSetupTool.addCluster(CLUSTER_NAME, true);
