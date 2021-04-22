@@ -151,7 +151,6 @@ public class TestAssignableInstanceManager {
     }
   }
 
-
   public class MockTaskDataCache extends TaskDataCache {
     private Map<String, JobConfig> _jobConfigMap;
     private Map<String, WorkflowConfig> _workflowConfigMap;
