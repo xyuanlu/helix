@@ -369,7 +369,6 @@ public class HelixStateTransitionHandler extends MessageHandler {
       // add task result to context for postHandling
       context.add(MapKey.HELIX_TASK_RESULT.toString(), taskResult);
       postHandleMessage();
-
       return taskResult;
     }
   }
