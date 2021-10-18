@@ -169,6 +169,7 @@ public class InstanceValidationUtil {
       return false;
     }
     if (!clusterConfig.isPersistIntermediateAssignment()) {
+      // TODO: fix log, currently log is "Cluster config -->%s<-- is not turned on"..
       _logger.error(
           "Cluster config %s is not turned on, which is required for instance stability check.",
           ClusterConfig.ClusterConfigProperty.PERSIST_INTERMEDIATE_ASSIGNMENT.toString());

@@ -110,4 +110,12 @@ public interface InstanceService {
      */
     Map<String, StoppableCheck> batchGetInstancesStoppableChecks(String clusterId, List<String> instances, String jsonContent)
             throws IOException;
+
+    //
+    MaintenanceManagementInstanceInfo takeInstance(String clusterId, String instance, List<String> healthChecks,
+        Map<String, String> healthCheckConfig, List<String> operations,
+        Map<String, String> operationConfig,  boolean performOperation);
+    Map<String, MaintenanceManagementInstanceInfo> takeInstances(String clusterId, List<String> instances, List<String> healthChecks,
+        Map<String, String> healthCheckConfig, List<String> operations,
+        Map<String, String> operationConfig,  boolean performOperation);
 }

@@ -21,10 +21,14 @@ package org.apache.helix.rest.server.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +57,7 @@ import org.apache.helix.rest.common.HelixDataAccessorWrapper;
 import org.apache.helix.rest.common.HelixRestNamespace;
 import org.apache.helix.rest.server.json.instance.InstanceInfo;
 import org.apache.helix.rest.server.json.instance.StoppableCheck;
+import org.apache.helix.util.HelixUtil;
 import org.apache.helix.util.InstanceValidationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,36 +189,53 @@ public class InstanceServiceImpl implements InstanceService {
   @Override
   public Map<String, StoppableCheck> batchGetInstancesStoppableChecks(String clusterId,
       List<String> instances, String jsonContent) throws IOException {
+    // helix instance check
     Map<String, StoppableCheck> finalStoppableChecks = new HashMap<>();
-    Map<String, Future<StoppableCheck>> helixInstanceChecks =
-        instances.stream().collect(Collectors.toMap(Function.identity(),
-            instance -> POOL.submit(() -> performHelixOwnInstanceCheck(clusterId, instance))));
-    List<String> instancesForCustomInstanceLevelChecks =
-        filterInstancesForNextCheck(helixInstanceChecks, finalStoppableChecks);
-    if (instancesForCustomInstanceLevelChecks.isEmpty()) {
-      // if all instances failed at helix custom level checks and all checks are not required
-      return finalStoppableChecks;
-    }
 
+    List<String> instancesForCustomInstanceLevelChecks =
+        batchHelixInstanceStoppableCheck(clusterId, instances, finalStoppableChecks);
+    // custom check, includes partition check.
+    batchCustomInstanceStoppableCheck(clusterId, instancesForCustomInstanceLevelChecks,
+        finalStoppableChecks, getCustomPayLoads(jsonContent));
+    return finalStoppableChecks;
+  }
+
+  // finalStoppableChecks contains instances that does not pass this health check
+  private List<String> batchHelixInstanceStoppableCheck(String clusterId,
+      Collection<String> instances, Map<String, StoppableCheck> finalStoppableChecks) {
+    Map<String, Future<StoppableCheck>> helixInstanceChecks = instances.stream().collect(Collectors
+        .toMap(Function.identity(),
+            instance -> POOL.submit(() -> performHelixOwnInstanceCheck(clusterId, instance))));
+    return filterInstancesForNextCheck(helixInstanceChecks, finalStoppableChecks);
+  }
+
+  //
+  private void batchCustomInstanceStoppableCheck(String clusterId, List<String> instances,
+      Map<String, StoppableCheck> finalStoppableChecks, Map<String, String> customPayLoads) {
     RESTConfig restConfig = _configAccessor.getRESTConfig(clusterId);
+    if (instances.isEmpty()) {
+      // if all instances failed at previous checks then all checks are not required
+      return;
+    }
     if (restConfig == null) {
-      String errorMessage =
-          String.format("The cluster %s hasn't enabled client side health checks yet, "
+      String errorMessage = String.format(
+          "The cluster %s hasn't enabled client side health checks yet, "
               + "thus the stoppable check result is inaccurate", clusterId);
       LOG.error(errorMessage);
-      throw new HelixException(errorMessage);
+      return;
+      // TODO: add exception back, this is only for POC
+      // throw new HelixException(errorMessage);
     }
-    Map<String, String> customPayLoads = getCustomPayLoads(jsonContent);
-    Map<String, Future<StoppableCheck>> customInstanceLevelChecks =
-        instancesForCustomInstanceLevelChecks.stream()
-            .collect(Collectors.toMap(Function.identity(),
-                instance -> POOL.submit(() -> performCustomInstanceCheck(clusterId, instance,
-                    restConfig.getBaseUrl(instance), customPayLoads))));
+    Map<String, Future<StoppableCheck>> customInstanceLevelChecks = instances.stream().collect(
+        Collectors.toMap(Function.identity(), instance -> POOL.submit(
+            () -> performCustomInstanceCheck(clusterId, instance, restConfig.getBaseUrl(instance),
+                customPayLoads))));
     List<String> instancesForCustomPartitionLevelChecks =
         filterInstancesForNextCheck(customInstanceLevelChecks, finalStoppableChecks);
     if (!instancesForCustomPartitionLevelChecks.isEmpty()) {
-      Map<String, StoppableCheck> instancePartitionLevelChecks = performPartitionsCheck(
-          instancesForCustomPartitionLevelChecks, restConfig, customPayLoads);
+      Map<String, StoppableCheck> instancePartitionLevelChecks =
+          performPartitionsCheck(instancesForCustomPartitionLevelChecks, restConfig,
+              customPayLoads);
       for (Map.Entry<String, StoppableCheck> instancePartitionStoppableCheckEntry : instancePartitionLevelChecks
           .entrySet()) {
         String instance = instancePartitionStoppableCheckEntry.getKey();
@@ -221,8 +243,145 @@ public class InstanceServiceImpl implements InstanceService {
         addStoppableCheck(finalStoppableChecks, instance, stoppableCheck);
       }
     }
+  }
 
-    return finalStoppableChecks;
+  // returned map is all instances with pass or fail
+  private Map<String, MaintenanceManagementInstanceInfo> batchInstanceHealthCheck(String clusterId,
+      List<String> instances, List<String> healthChecks, Map<String, String> healthCheckConfig) {
+    List<String> instanceSetForNext = new ArrayList<>(instances);
+    Map<String, MaintenanceManagementInstanceInfo> instanceInfos = new HashMap<>();
+    Map<String, StoppableCheck> finalStoppableChecks = new HashMap<>();
+    for (String healthCheck : healthChecks) {
+      // should we add per zone filter?
+      if (healthCheck.equals("HelixInstanceStoppableCheck")) {
+        // this is helix own check
+        List<String> instancesForCustomInstanceLevelChecks =
+            batchHelixInstanceStoppableCheck(clusterId, instanceSetForNext, finalStoppableChecks);
+        LOG.info("batchInstanceHealthCheck  instancesForCustomInstanceLevelChecks:"
+            + instancesForCustomInstanceLevelChecks.toString());
+        instanceSetForNext = instancesForCustomInstanceLevelChecks;
+      } else if (healthCheck.equals("CostumeInstanceStoppableCheck")) {
+        // custom check, includes custom Instance check and partition check.
+        batchCustomInstanceStoppableCheck(clusterId, instanceSetForNext, finalStoppableChecks,
+            healthCheckConfig);
+      } else {
+        throw new UnsupportedOperationException(healthCheck + " is not supported yet!");
+      }
+    }
+    for (String instance : instances) {
+      MaintenanceManagementInstanceInfo result;
+      if (finalStoppableChecks.containsKey(instance) && !finalStoppableChecks.get(instance)
+          .isStoppable()) {
+        StoppableCheck instanceStoppableCheck = finalStoppableChecks.get(instance);
+        result =
+            new MaintenanceManagementInstanceInfo(MaintenanceManagementInstanceInfo.Status.FAILURE);
+        result.addFailureMessage(instanceStoppableCheck.getFailedChecks());
+        instanceSetForNext.remove(instance);
+      } else {
+        result =
+            new MaintenanceManagementInstanceInfo(MaintenanceManagementInstanceInfo.Status.SUCCESS);
+      }
+      instanceInfos.put(instance, result);
+    }
+    return instanceInfos;
+  }
+
+  @Override
+  public MaintenanceManagementInstanceInfo takeInstance(String clusterId, String instanceName,
+      List<String> healthChecks, Map<String, String> healthCheckConfig, List<String> operations,
+      Map<String, String> operationConfig, boolean performOperation) {
+
+    // health check
+    MaintenanceManagementInstanceInfo instanceInfo =
+        batchInstanceHealthCheck(clusterId, ImmutableList.of(instanceName), healthChecks,
+            healthCheckConfig).get(instanceName);
+    if (!instanceInfo.isSuccessful()) {
+      return instanceInfo;
+    }
+
+    // operation check and execute
+    List<OperationAbstractClass> operationAbstractClassList = getAllOperationClasses(operations);
+    // do all the checks
+    for (OperationAbstractClass operationClass : operationAbstractClassList) {
+      MaintenanceManagementInstanceInfo checkResult =
+          operationClass.operationCheckForTakeSingleInstance(instanceName, operationConfig);
+      if (!checkResult.isSuccessful()) {
+        instanceInfo.mergeResult(checkResult);
+      }
+    }
+    if (performOperation) {
+      // do all operations
+      for (OperationAbstractClass operationClass : operationAbstractClassList) {
+        instanceInfo.mergeResult(
+            operationClass.operationExecForTakeSingleInstance(instanceName, operationConfig));
+        if (!instanceInfo.isSuccessful()) {
+          break;
+        }
+      }
+    }
+    return instanceInfo;
+  }
+
+  @Override
+  public Map<String, MaintenanceManagementInstanceInfo> takeInstances(String clusterId,
+      List<String> instances, List<String> healthChecks, Map<String, String> healthCheckConfig,
+      List<String> operations, Map<String, String> operationConfig, boolean performOperation) {
+    Set<String> instancesSet = new HashSet<>(instances);
+    // health check
+    Map<String, MaintenanceManagementInstanceInfo> instanceInfos =
+        batchInstanceHealthCheck(clusterId, instances, healthChecks, healthCheckConfig);
+    instanceInfos.forEach((key, value) -> {
+      if (!value.isSuccessful()) {
+        instancesSet.remove(key);
+      }
+    });
+
+    // get all operation classes
+    List<OperationAbstractClass> operationAbstractClassList = getAllOperationClasses(operations);
+
+    // do all the checks
+    for (OperationAbstractClass operationClass : operationAbstractClassList) {
+      Map<String, MaintenanceManagementInstanceInfo> checkResults =
+          operationClass.operationCheckForTakeInstances(instancesSet, operationConfig);
+      checkResults.forEach((k, v) -> {
+        if (!v.isSuccessful()) {
+          instancesSet.remove(k);
+          instanceInfos.get(k).mergeResult(v);
+        }
+      });
+      if (instancesSet.isEmpty()) {
+        return instanceInfos;
+      }
+    }
+    if (performOperation) {
+      // do all operations
+      for (OperationAbstractClass operationClass : operationAbstractClassList) {
+        Map<String, MaintenanceManagementInstanceInfo> checkResults =
+            operationClass.operationExecForTakeInstances(instancesSet, operationConfig);
+        checkResults.forEach((k, v) -> {
+          if (!v.isSuccessful()) {
+            instancesSet.remove(k);
+          }
+          instanceInfos.get(k).mergeResult(v);
+        });
+      }
+    }
+    return instanceInfos;
+  }
+
+  private List<OperationAbstractClass> getAllOperationClasses(List<String> operations) {
+    List<OperationAbstractClass> operationAbstractClassList = new ArrayList<>();
+    for (String operationClassName : operations) {
+      try {
+        OperationAbstractClass userOperation =
+            (OperationAbstractClass) HelixUtil.loadClass(getClass(), operationClassName)
+                .newInstance();
+        operationAbstractClassList.add(userOperation);
+      } catch (Exception e) {
+        LOG.error("No operation class found:" + Arrays.toString(e.getStackTrace()));
+      }
+    }
+    return operationAbstractClassList;
   }
 
   private void addStoppableCheck(Map<String, StoppableCheck> stoppableChecks, String instance,
@@ -242,6 +401,7 @@ public class InstanceServiceImpl implements InstanceService {
     for (Map.Entry<String, Future<StoppableCheck>> entry : futureStoppableCheckByInstance
         .entrySet()) {
       String instance = entry.getKey();
+      LOG.info("filterInstancesForNextCheck. Instance: {}", instance);
       try {
         StoppableCheck stoppableCheck = entry.getValue().get();
         if (!stoppableCheck.isStoppable()) {
