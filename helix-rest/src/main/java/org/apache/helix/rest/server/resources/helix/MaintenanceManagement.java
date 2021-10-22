@@ -13,8 +13,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.rest.common.HttpConstants;
-import org.apache.helix.rest.server.service.InstanceService;
-import org.apache.helix.rest.server.service.InstanceServiceImpl;
+import org.apache.helix.rest.maintenanceService.MaintenanceManagementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,12 +35,12 @@ public class MaintenanceManagement extends AbstractHelixResource {
   @POST
   public Response takeInstance(@PathParam("clusterId") String clusterId,String content) {
     try {
-      InstanceService instanceService =
-          new InstanceServiceImpl((ZKHelixDataAccessor) getDataAccssor(clusterId),
+      MaintenanceManagementService maintenanceManagementService =
+          new MaintenanceManagementService((ZKHelixDataAccessor) getDataAccssor(clusterId),
               getConfigAccessor(), false, false, getNamespace());
 
       String operationClassName = "org.apache.helix.rest.server.service.OperationImpl"; //readInput(content);
-      return JSONRepresentation(instanceService.takeInstance(clusterId,
+      return JSONRepresentation(maintenanceManagementService.takeInstance(clusterId,
           "HMP-node_0-ltx1-app2319.stg.linkedin.com_6467",
           Collections.singletonList("HelixInstanceStoppableCheck"), new HashMap<>(),
           Collections.singletonList(operationClassName), new HashMap<>(), true));

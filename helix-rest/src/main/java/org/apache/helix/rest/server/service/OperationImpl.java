@@ -6,6 +6,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.helix.rest.maintenanceService.MaintenanceManagementInstanceInfo;
+import org.apache.helix.rest.maintenanceService.OperationAbstractClass;
+
 
 public class OperationImpl implements OperationAbstractClass {
 

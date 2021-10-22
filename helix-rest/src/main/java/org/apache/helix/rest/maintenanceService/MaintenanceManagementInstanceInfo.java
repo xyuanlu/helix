@@ -1,4 +1,4 @@
-package org.apache.helix.rest.server.service;
+package org.apache.helix.rest.maintenanceService;
 
 import java.util.ArrayList;
 import java.util.List;

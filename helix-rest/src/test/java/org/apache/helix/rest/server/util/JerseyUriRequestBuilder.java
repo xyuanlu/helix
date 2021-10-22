@@ -131,6 +131,7 @@ public class JerseyUriRequestBuilder {
    */
   public Response post(JerseyTestNg.ContainerPerClassTest container, Entity entity) {
     final Response response = buildWebTarget(container).request().post(entity);
+    System.out.println("Response: "+ response.toString());
     Assert.assertEquals(response.getStatus(), _expectedStatusCode);
     return response;
   }
