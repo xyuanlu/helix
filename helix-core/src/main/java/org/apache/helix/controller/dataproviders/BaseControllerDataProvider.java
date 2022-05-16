@@ -28,12 +28,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
@@ -61,6 +63,7 @@ import org.apache.helix.model.PauseSignal;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.task.TaskConstants;
+import org.apache.helix.util.ConfigStringUtil;
 import org.apache.helix.util.HelixUtil;
 import org.apache.helix.util.InstanceValidationUtil;
 import org.slf4j.Logger;
@@ -242,10 +245,47 @@ public class BaseControllerDataProvider implements ControlContextProvider {
       _clusterConfig = accessor.getProperty(accessor.keyBuilder().clusterConfig());
       refreshedType.add(HelixConstants.ChangeType.CLUSTER_CONFIG);
       refreshAbnormalStateResolverMap(_clusterConfig);
+      updateBatchDisablecFormat(accessor);
     } else {
       LogUtil.logInfo(logger, getClusterEventId(), String.format(
           "No ClusterConfig change for cluster %s, pipeline %s", _clusterName, getPipelineName()));
     }
+  }
+
+  private void updateBatchDisablecFormat(final HelixDataAccessor accessor){
+    Map<String, String> disabledInstances = _clusterConfig.getDisabledInstances();
+    Map<String, String> DisabledInstancesWithInfo = _clusterConfig.getDisabledInstancesWithInfo();
+
+    ClusterConfig newclusterConfig = new ClusterConfig(_clusterConfig.getRecord());
+    Map<String, String> newDisabledInstances = new TreeMap<>(newclusterConfig.getDisabledInstances());
+    Map<String, String> newDisabledInstancesWithInfo = new TreeMap<>(newclusterConfig.getDisabledInstancesWithInfo());
+
+    boolean needUpdate = false;
+
+    // interate through all k,v pairs and check for string format.
+    for (Map.Entry<String, String> instanceInfo: disabledInstances.entrySet()) {
+      if (!StringUtils.isNumeric(instanceInfo.getValue())) {
+          Map<String, String> disabledInstanceInfo = ConfigStringUtil.parseConcatenatedConfig(instanceInfo.getValue());
+        newDisabledInstances.put(instanceInfo.getKey(), disabledInstanceInfo.get(
+            ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP.toString()));
+        newDisabledInstancesWithInfo.put(instanceInfo.getKey(), instanceInfo.getValue());
+        needUpdate = true;
+      } else {
+        if(!DisabledInstancesWithInfo.containsKey(instanceInfo.getValue())) {
+          Map<String, String> instanceDisabledMetadata = new HashMap<>();
+          instanceDisabledMetadata.put(ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP.toString(), instanceInfo.getValue());
+          newDisabledInstancesWithInfo.put(instanceInfo.getValue(), ConfigStringUtil.concatenateMapping(instanceDisabledMetadata));
+          needUpdate = true;
+        }
+      }
+    }
+    if (needUpdate) {
+      newclusterConfig.setDisabledInstances(newDisabledInstances);
+      newclusterConfig.setDisabledInstancesWithInfo(newDisabledInstancesWithInfo);
+      accessor.updateProperty(accessor.keyBuilder().clusterConfig(), newclusterConfig);
+      _clusterConfig =newclusterConfig;
+    }
+
   }
 
   private void refreshIdealState(final HelixDataAccessor accessor,
