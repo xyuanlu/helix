@@ -273,35 +273,33 @@ public class BaseControllerDataProvider implements ControlContextProvider {
             Map<String, String> DisabledInstancesWithInfo =
                 clusterConfig.getDisabledInstancesWithInfo();
 
-            ClusterConfig newclusterConfig = new ClusterConfig(currentData);
+            ClusterConfig newClusterConfig = new ClusterConfig(currentData);
             Map<String, String> newDisabledInstances =
-                new TreeMap<>(newclusterConfig.getDisabledInstances());
+                new TreeMap<>(newClusterConfig.getDisabledInstances());
             Map<String, String> newDisabledInstancesWithInfo =
-                new TreeMap<>(newclusterConfig.getDisabledInstancesWithInfo());
+                new TreeMap<>(newClusterConfig.getDisabledInstancesWithInfo());
 
-            // interate through all k,v pairs and check for string format.
+            // iterate through all k,v pairs and check for string format.
             for (Map.Entry<String, String> instanceInfo : disabledInstances.entrySet()) {
+              String instanceName = instanceInfo.getKey();
               if (!StringUtils.isNumeric(instanceInfo.getValue())) {
-                Map<String, String> disabledInstanceInfo =
-                    ConfigStringUtil.parseConcatenatedConfig(instanceInfo.getValue());
-                newDisabledInstances.put(instanceInfo.getKey(), disabledInstanceInfo.get(
-                    ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP
-                        .toString()));
-                newDisabledInstancesWithInfo.put(instanceInfo.getKey(), instanceInfo.getValue());
+                newDisabledInstances.put(instanceName,
+                    ConfigStringUtil.parseConcatenatedConfig(instanceName).get(
+                        ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP
+                            .toString()));
+                newDisabledInstancesWithInfo.put(instanceName, instanceInfo.getValue());
               } else {
-                if (!DisabledInstancesWithInfo.containsKey(instanceInfo.getValue())) {
-                  Map<String, String> instanceDisabledMetadata = new HashMap<>();
-                  instanceDisabledMetadata.put(
-                      ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP
-                          .toString(), instanceInfo.getValue());
-                  newDisabledInstancesWithInfo.put(instanceInfo.getValue(),
-                      ConfigStringUtil.concatenateMapping(instanceDisabledMetadata));
+                if (!DisabledInstancesWithInfo.containsKey(instanceName)) {
+                  newDisabledInstancesWithInfo.put(instanceName, ConfigStringUtil
+                      .concatenateMapping(Collections.singletonMap(
+                          ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP
+                              .toString(), instanceInfo.getValue())));
                 }
               }
             }
-            newclusterConfig.setDisabledInstances(newDisabledInstances);
-            newclusterConfig.setDisabledInstancesWithInfo(newDisabledInstancesWithInfo);
-            return newclusterConfig.getRecord();
+            newClusterConfig.setDisabledInstances(newDisabledInstances);
+            newClusterConfig.setDisabledInstancesWithInfo(newDisabledInstancesWithInfo);
+            return newClusterConfig.getRecord();
           }
         }, null);
   }
