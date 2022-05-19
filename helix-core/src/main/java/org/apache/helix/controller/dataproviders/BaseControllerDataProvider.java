@@ -244,9 +244,14 @@ public class BaseControllerDataProvider implements ControlContextProvider {
     if (_propertyDataChangedMap.get(HelixConstants.ChangeType.CLUSTER_CONFIG).getAndSet(false)) {
       _clusterConfig = accessor.getProperty(accessor.keyBuilder().clusterConfig());
       refreshedType.add(HelixConstants.ChangeType.CLUSTER_CONFIG);
-      if (checkBatchedDisabledInstanceFormat(_clusterConfig) && updateBatchDisablecFormat(
+      // TODO: This is a temp function to clean up incompatible batched disabled instances format.
+      // Remove in later version.
+      if (checkBatchedDisabledInstanceFormat(_clusterConfig) && updateBatchDisableFormat(
           accessor)) {
         // read from zkz one more time
+        LogUtil.logInfo(logger, getClusterEventId(), String
+            .format("Clean ClusterConfig change for cluster %s, pipeline %s", _clusterName,
+                getPipelineName()));
         _clusterConfig = accessor.getProperty(accessor.keyBuilder().clusterConfig());
       }
       refreshAbnormalStateResolverMap(_clusterConfig);
@@ -257,8 +262,10 @@ public class BaseControllerDataProvider implements ControlContextProvider {
     }
   }
 
-  private boolean updateBatchDisablecFormat(final HelixDataAccessor accessor) {
-
+  // TODO: This function is used to clean up incompatible batched disabled instances format for
+  // "DISABLED_INSTANCES" introduced in 1.0.3.0. This temp change shoul dbe reverted after 1.0.5.0 \
+  // or later version.
+  private boolean updateBatchDisableFormat(final HelixDataAccessor accessor) {
     return accessor
         .updateProperty(accessor.keyBuilder().clusterConfig(), new DataUpdater<ZNRecord>() {
           @Override
@@ -284,7 +291,7 @@ public class BaseControllerDataProvider implements ControlContextProvider {
               String instanceName = instanceInfo.getKey();
               if (!StringUtils.isNumeric(instanceInfo.getValue())) {
                 newDisabledInstances.put(instanceName,
-                    ConfigStringUtil.parseConcatenatedConfig(instanceName).get(
+                    ConfigStringUtil.parseConcatenatedConfig(instanceInfo.getValue()).get(
                         ClusterConfig.ClusterConfigProperty.HELIX_ENABLED_DISABLE_TIMESTAMP
                             .toString()));
                 newDisabledInstancesWithInfo.put(instanceName, instanceInfo.getValue());
@@ -311,7 +318,7 @@ public class BaseControllerDataProvider implements ControlContextProvider {
     // interate through all k,v pairs and check for string format.
     for (Map.Entry<String, String> instanceInfo : disabledInstances.entrySet()) {
       if (!StringUtils.isNumeric(instanceInfo.getValue()) || !DisabledInstancesWithInfo
-          .containsKey(instanceInfo.getValue())) {
+          .containsKey(instanceInfo.getKey())) {
         return true;
       }
     }
