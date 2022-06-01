@@ -79,8 +79,11 @@ public class InstanceValidationUtil {
       throw new HelixException("InstanceConfig or ClusterConfig is NULL");
     }
 
-    return isInstanceEnabled(instanceConfig, clusterConfig);
-
+    boolean enabledInInstanceConfig = instanceConfig.getInstanceEnabled();
+    Map<String, String> disabledInstances = clusterConfig.getDisabledInstances();
+    boolean enabledInClusterConfig =
+        disabledInstances == null || !disabledInstances.keySet().contains(instanceName);
+    return enabledInClusterConfig && enabledInInstanceConfig;
   }
 
   public static String getInstanceHelixDisabledType(HelixDataAccessor dataAccessor,
@@ -91,12 +94,6 @@ public class InstanceValidationUtil {
       throw new HelixException("ClusterConfig is NULL");
     }
 
-    String instanceDisabledTypeBatchedMode =
-        clusterConfig.getPlainInstanceHelixDisabledType(instanceName);
-    if (instanceDisabledTypeBatchedMode != null) {
-      return InstanceConstants.InstanceDisabledType.valueOf(instanceDisabledTypeBatchedMode)
-          .toString();
-    }
     // TODO deprecate reading instance level config once migrated the enable status to cluster config only
     InstanceConfig instanceConfig =
         dataAccessor.getProperty(propertyKeyBuilder.instanceConfig(instanceName));
@@ -114,24 +111,8 @@ public class InstanceValidationUtil {
         : instanceConfig.getInstanceDisabledType();
   }
 
-  /**
-   * Check if the instance is enabled by configuration
-   * @param instanceConfig
-   * @param clusterConfig
-   * @return
-   */
   public static boolean isInstanceEnabled(InstanceConfig instanceConfig, ClusterConfig clusterConfig) {
-    if (instanceConfig == null) {
-      throw new HelixException("InstanceConfig is NULL");
-    }
-    boolean enabledInInstanceConfig = instanceConfig.getInstanceEnabled();
-    if (clusterConfig == null) {
-      return enabledInInstanceConfig;
-    }
-    boolean enabledInClusterConfig =
-        !clusterConfig.getDisabledInstances().containsKey(instanceConfig.getInstanceName())
-        && !clusterConfig.getDisabledInstancesWithInfo().containsKey(instanceConfig.getInstanceName());
-    return enabledInClusterConfig && enabledInInstanceConfig;
+    return instanceConfig.getInstanceEnabled();
   }
 
   /**
@@ -141,8 +122,7 @@ public class InstanceValidationUtil {
    * @return
    */
   public static boolean isAlive(HelixDataAccessor dataAccessor, String instanceName) {
-    LiveInstance liveInstance =
-        dataAccessor.getProperty(dataAccessor.keyBuilder().liveInstance(instanceName));
+    LiveInstance liveInstance = dataAccessor.getProperty(dataAccessor.keyBuilder().liveInstance(instanceName));
     return liveInstance != null;
   }
 
