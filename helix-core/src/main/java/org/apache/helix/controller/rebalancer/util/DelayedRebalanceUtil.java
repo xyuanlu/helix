@@ -31,7 +31,6 @@ import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.ResourceConfig;
-import org.apache.helix.util.InstanceValidationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,16 +136,8 @@ public class DelayedRebalanceUtil {
     }
 
     // check the time instance got disabled.
-    if (!InstanceValidationUtil.isInstanceEnabled(instanceConfig, clusterConfig)) {
+    if (!instanceConfig.getInstanceEnabled() ) {
       long disabledTime = instanceConfig.getInstanceEnabledTime();
-      String batchedDisabledTime = clusterConfig.getInstanceHelixDisabledTimeStamp(instance);
-      if (batchedDisabledTime != null && !batchedDisabledTime.isEmpty()) {
-        // Update batch disable time
-        long batchDisableTime = Long.parseLong(batchedDisabledTime);
-        if (disabledTime == -1 || disabledTime > batchDisableTime) {
-          disabledTime = batchDisableTime;
-        }
-      }
       if (disabledTime > 0 && disabledTime + delay < inactiveTime) {
         inactiveTime = disabledTime + delay;
       }
