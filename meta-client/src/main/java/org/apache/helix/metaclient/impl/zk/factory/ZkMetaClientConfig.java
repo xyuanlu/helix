@@ -20,6 +20,7 @@ package org.apache.helix.metaclient.impl.zk.factory;
  */
 
 import org.apache.helix.metaclient.factories.MetaClientConfig;
+import org.apache.helix.metaclient.policy.MetaClientReconnectPolicy;
 import org.apache.helix.zookeeper.zkclient.serialize.BasicZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.PathBasedZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.SerializableSerializer;
@@ -60,17 +61,16 @@ public class ZkMetaClientConfig extends MetaClientConfig {
   }
 
   protected ZkMetaClientConfig(String connectionAddress, long connectionInitTimeoutInMillis,
-      long sessionTimeoutInMillis, boolean enableAuth, StoreType storeType, String monitorType,
-      String monitorKey, String monitorInstanceName, boolean monitorRootPathOnly,
-      PathBasedZkSerializer zkSerializer) {
-    super(connectionAddress, connectionInitTimeoutInMillis, sessionTimeoutInMillis, enableAuth,
-        storeType);
+      long sessionTimeoutInMillis, MetaClientReconnectPolicy reconnectPolicy, boolean enableAuth,
+      StoreType storeType, String monitorType, String monitorKey, String monitorInstanceName,
+      boolean monitorRootPathOnly, PathBasedZkSerializer zkSerializer) {
+    super(connectionAddress, connectionInitTimeoutInMillis, sessionTimeoutInMillis, reconnectPolicy,
+        enableAuth, storeType);
     _zkSerializer = zkSerializer;
     _monitorType = monitorType;
     _monitorKey = monitorKey;
     _monitorInstanceName = monitorInstanceName;
     _monitorRootPathOnly = monitorRootPathOnly;
-
   }
 
   public static class ZkMetaClientConfigBuilder extends MetaClientConfig.MetaClientConfigBuilder<ZkMetaClientConfigBuilder> {
@@ -129,17 +129,20 @@ public class ZkMetaClientConfig extends MetaClientConfig {
 
     @Override
     public ZkMetaClientConfig build() {
-      if (_zkSerializer == null) {
-        _zkSerializer = new BasicZkSerializer(new SerializableSerializer());
-      }
+      validate();
+
       return new ZkMetaClientConfig(_connectionAddress, _connectionInitTimeoutInMillis,
-          _sessionTimeoutInMillis, _enableAuth, MetaClientConfig.StoreType.ZOOKEEPER, _monitorType,
-          _monitorKey, _monitorInstanceName, _monitorRootPathOnly, _zkSerializer);
+          _sessionTimeoutInMillis, _metaClientReconnectPolicy, _enableAuth,
+          MetaClientConfig.StoreType.ZOOKEEPER, _monitorType, _monitorKey, _monitorInstanceName,
+          _monitorRootPathOnly, _zkSerializer);
     }
 
     @Override
     protected void validate() {
       super.validate();
+      if (_zkSerializer == null) {
+        _zkSerializer = new BasicZkSerializer(new SerializableSerializer());
+      }
     }
   }
 }

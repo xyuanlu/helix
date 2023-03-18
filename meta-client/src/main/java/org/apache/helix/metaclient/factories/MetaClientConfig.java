@@ -20,6 +20,8 @@ package org.apache.helix.metaclient.factories;
  */
 
 import org.apache.helix.metaclient.constants.MetaClientConstants;
+import org.apache.helix.metaclient.policy.ExponentialBackoffReconnectPolicy;
+import org.apache.helix.metaclient.policy.MetaClientReconnectPolicy;
 
 public class MetaClientConfig {
 
@@ -35,6 +37,10 @@ public class MetaClientConfig {
   // When a client becomes partitioned from the metadata service for more than session timeout,
   // new session will be established when reconnect.
   private final long _sessionTimeoutInMillis;
+
+  // Policy to define client re-establish connection behavior when the connection to underlying
+  // metadata store is expired.
+  private final MetaClientReconnectPolicy _metaClientReconnectPolicy;
 
   private final boolean _enableAuth;
   private final StoreType _storeType;
@@ -59,21 +65,21 @@ public class MetaClientConfig {
     return _sessionTimeoutInMillis;
   }
 
+  public MetaClientReconnectPolicy getMetaClientReconnectPolicy() {
+    return _metaClientReconnectPolicy;
+  }
+
   // TODO: More options to add later
   // private boolean _autoReRegistWatcher;  // re-register one time watcher when set to true
   // private boolean _resetWatchWhenReConnect; // re-register previous existing watcher when reconnect
-  //
-  //  public enum RetryProtocol {
-  //    NO_RETRY, EXP_BACK_OFF, CONST_RETRY_INTERVAL
-  //  }
-  //  private RetryProtocol _retryProtocol;
-
 
   protected MetaClientConfig(String connectionAddress, long connectionInitTimeoutInMillis,
-      long sessionTimeoutInMillis, boolean enableAuth, StoreType storeType) {
+      long sessionTimeoutInMillis, MetaClientReconnectPolicy metaClientReconnectPolicy,
+      boolean enableAuth, StoreType storeType) {
     _connectionAddress = connectionAddress;
     _connectionInitTimeoutInMillis = connectionInitTimeoutInMillis;
     _sessionTimeoutInMillis = sessionTimeoutInMillis;
+    _metaClientReconnectPolicy = metaClientReconnectPolicy;
     _enableAuth = enableAuth;
     _storeType = storeType;
   }
@@ -83,21 +89,20 @@ public class MetaClientConfig {
 
     protected long _connectionInitTimeoutInMillis;
     protected long _sessionTimeoutInMillis;
-    // protected long _operationRetryTimeout;
-    // protected RetryProtocol _retryProtocol;
     protected boolean _enableAuth;
     protected StoreType _storeType;
+    protected MetaClientReconnectPolicy _metaClientReconnectPolicy;
 
 
     public MetaClientConfig build() {
       validate();
       return new MetaClientConfig(_connectionAddress, _connectionInitTimeoutInMillis,
-          _sessionTimeoutInMillis,
-          _enableAuth, _storeType);
+          _sessionTimeoutInMillis, _metaClientReconnectPolicy, _enableAuth, _storeType);
     }
 
     public MetaClientConfigBuilder() {
       // set default values
+      setStoreType(StoreType.ZOOKEEPER);
       setAuthEnabled(false);
       setConnectionInitTimeoutInMillis(MetaClientConstants.DEFAULT_CONNECTION_INIT_TIMEOUT_MS);
       setSessionTimeoutInMillis(MetaClientConstants.DEFAULT_SESSION_TIMEOUT_MS);
@@ -114,12 +119,23 @@ public class MetaClientConfig {
     }
 
     /**
-     * Set timeout in mm for connection initialization timeout
+     * Set timeout in ms for connection initialization timeout
      * @param timeout
      * @return
      */
     public B setConnectionInitTimeoutInMillis(long timeout) {
       _connectionInitTimeoutInMillis = timeout;
+      return self();
+    }
+
+    /**
+     * Set reconnect policy when connection is lost or expired. By default is
+     * ExponentialBackoffReconnectPolicy
+     * @param reconnectPolicy an instance of type MetaClientReconnectPolicy
+     * @return
+     */
+    public B setMetaClientReconnectPolicy(MetaClientReconnectPolicy reconnectPolicy) {
+      _metaClientReconnectPolicy = reconnectPolicy;
       return self();
     }
 
@@ -145,6 +161,10 @@ public class MetaClientConfig {
     }
 
     protected void validate() {
+      if (_metaClientReconnectPolicy == null) {
+        _metaClientReconnectPolicy = new ExponentialBackoffReconnectPolicy();
+      }
+
       if (_storeType == null || _connectionAddress == null) {
         throw new IllegalArgumentException(
             "MetaClientConfig.Builder: store type or connection string is null");

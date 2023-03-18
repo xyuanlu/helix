@@ -37,11 +37,12 @@ import org.apache.helix.metaclient.exception.MetaClientTimeoutException;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
-import org.apache.helix.zookeeper.zkclient.exception.ZkNodeExistsException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.helix.zookeeper.zkclient.exception.ZkTimeoutException;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Op;
+import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.server.EphemeralType;
@@ -52,7 +53,7 @@ public class ZkMetaClientUtil {
   private static final List<ACL> DEFAULT_ACL =
       Collections.unmodifiableList(ZooDefs.Ids.OPEN_ACL_UNSAFE);
 
-  private ZkMetaClientUtil(){
+  private ZkMetaClientUtil() {
   }
 
   /**
@@ -218,16 +219,15 @@ public class ZkMetaClientUtil {
         return MetaClientInterface.EntryMode.CONTAINER;
       case NORMAL:
         return MetaClientInterface.EntryMode.EPHEMERAL;
-      // TODO: TTL is not supported now.
-      //case TTL:
-      //  return EntryMode.TTL;
+      case TTL:
+        return MetaClientInterface.EntryMode.TTL;
       default:
         throw new IllegalArgumentException(zkEphemeralType + " is not supported.");
     }
   }
 
   public static MetaClientException translateZkExceptionToMetaclientException(ZkException e) {
-    if (e instanceof ZkNodeExistsException) {
+    if (e instanceof ZkNoNodeException) {
       return new MetaClientNoNodeException(e);
     } else if (e instanceof ZkBadVersionException) {
       return new MetaClientBadVersionException(e);
@@ -237,6 +237,29 @@ public class ZkMetaClientUtil {
       return new MetaClientInterruptException(e);
     }
     return new MetaClientException(e);
+  }
+
+  public static MetaClientInterface.ConnectState translateKeeperStateToMetaClientConnectState(
+      Watcher.Event.KeeperState keeperState) {
+    if (keeperState == null)
+      return MetaClientInterface.ConnectState.NOT_CONNECTED;
+    switch (keeperState) {
+      case AuthFailed:
+        return MetaClientInterface.ConnectState.AUTH_FAILED;
+      case Closed:
+        return MetaClientInterface.ConnectState.CLOSED_BY_CLIENT;
+      case Disconnected:
+        return MetaClientInterface.ConnectState.DISCONNECTED;
+      case Expired:
+        return MetaClientInterface.ConnectState.EXPIRED;
+      case SaslAuthenticated:
+        return MetaClientInterface.ConnectState.AUTHENTICATED;
+      case SyncConnected:
+      case ConnectedReadOnly:
+        return MetaClientInterface.ConnectState.CONNECTED;
+      default:
+        throw new IllegalArgumentException(keeperState + " is not a supported.");
+    }
   }
 
   /**

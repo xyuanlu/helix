@@ -34,8 +34,10 @@ import org.apache.helix.metaclient.api.MetaClientInterface;
 import org.apache.helix.metaclient.api.Op;
 import org.apache.helix.metaclient.api.OpResult;
 import org.apache.helix.metaclient.exception.MetaClientException;
+import org.apache.helix.metaclient.exception.MetaClientNoNodeException;
 import org.apache.helix.metaclient.impl.zk.adapter.DataListenerAdapter;
 import org.apache.helix.metaclient.impl.zk.adapter.DirectChildListenerAdapter;
+import org.apache.helix.metaclient.impl.zk.adapter.StateChangeListenerAdapter;
 import org.apache.helix.metaclient.impl.zk.adapter.ZkMetaClientCreateCallbackHandler;
 import org.apache.helix.metaclient.impl.zk.adapter.ZkMetaClientDeleteCallbackHandler;
 import org.apache.helix.metaclient.impl.zk.adapter.ZkMetaClientExistCallbackHandler;
@@ -58,15 +60,20 @@ import static org.apache.helix.metaclient.impl.zk.util.ZkMetaClientUtil.translat
 public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ZkMetaClient.class);
   private final ZkClient _zkClient;
-  private final int _connectionTimeout;
+  private final long _initConnectionTimeout;
+  private final long _reconnectTimeout;
 
   public ZkMetaClient(ZkMetaClientConfig config) {
-    _connectionTimeout = (int) config.getConnectionInitTimeoutInMillis();
+    _initConnectionTimeout = config.getConnectionInitTimeoutInMillis();
+    _reconnectTimeout = config.getMetaClientReconnectPolicy().getAutoReconnectTimeout();
+    // TODO: Right new ZkClient reconnect using exp backoff with fixed max backoff interval. We should
+    // 1. Allow user to config max backoff interval (next PR)
+    // 2. Allow user to config reconnect policy (future PR)
     _zkClient = new ZkClient(
         new ZkConnection(config.getConnectionAddress(), (int) config.getSessionTimeoutInMillis()),
-        _connectionTimeout, -1 /*operationRetryTimeout*/, config.getZkSerializer(),
-        config.getMonitorType(), config.getMonitorKey(), config.getMonitorInstanceName(),
-        config.getMonitorRootPathOnly(), false);
+        (int) _initConnectionTimeout, _reconnectTimeout /*use reconnect timeout for retry timeout*/,
+        config.getZkSerializer(), config.getMonitorType(), config.getMonitorKey(),
+        config.getMonitorInstanceName(), config.getMonitorRootPathOnly(), false);
   }
 
   @Override
@@ -86,6 +93,24 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
     } catch (ZkException | KeeperException e) {
       throw new MetaClientException(e);
     }
+  }
+
+  @Override
+  public void createWithTTL(String key, T data, long ttl) {
+    try{
+      _zkClient.createPersistentWithTTL(key, data, ttl);
+    } catch (ZkException e) {
+      throw translateZkExceptionToMetaclientException(e);
+    }
+  }
+
+  @Override
+  public void renewTTLNode(String key) {
+    T oldData = get(key);
+    if (oldData == null) {
+      throw new MetaClientNoNodeException("Node at " + key + " does not exist.");
+    }
+    set(key, oldData, _zkClient.getStat(key).getVersion());
   }
 
   @Override
@@ -111,6 +136,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
     }
   }
 
+  //TODO: Get Expiry Time in Stat
   @Override
   public Stat exists(String key) {
     org.apache.zookeeper.data.Stat zkStats;
@@ -120,7 +146,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
         return null;
       }
       return new Stat(convertZkEntryModeToMetaClientEntryMode(zkStats.getEphemeralOwner()),
-          zkStats.getVersion());
+          zkStats.getVersion(), zkStats.getCtime(), zkStats.getMtime(), -1);
     } catch (ZkException e) {
       throw translateZkExceptionToMetaclientException(e);
     }
@@ -242,7 +268,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
   public void connect() {
     // TODO: throws IllegalStateException when already connected
     try {
-      _zkClient.connect(_connectionTimeout, _zkClient);
+      _zkClient.connect(_initConnectionTimeout, _zkClient);
     } catch (ZkException e) {
       throw translateZkExceptionToMetaclientException(e);
     }
@@ -275,7 +301,8 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
 
   @Override
   public boolean subscribeStateChanges(ConnectStateChangeListener listener) {
-    return false;
+    _zkClient.subscribeStateChanges(new StateChangeListenerAdapter(listener));
+    return true;
   }
 
   @Override
@@ -300,7 +327,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
 
   @Override
   public void unsubscribeConnectStateChanges(ConnectStateChangeListener listener) {
-
+    _zkClient.subscribeStateChanges(new StateChangeListenerAdapter(listener));
   }
 
   @Override

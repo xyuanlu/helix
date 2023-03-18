@@ -56,6 +56,9 @@ public interface MetaClientInterface<T> {
   }
 
   enum ConnectState {
+    // Client is not connected to server. Before initiating connection or after close.
+    NOT_CONNECTED,
+
     // Client is connected to server
     CONNECTED,
 
@@ -65,20 +68,33 @@ public interface MetaClientInterface<T> {
     // Server has expired this connection.
     EXPIRED,
 
-    // When client failed to connect server.
-    INIT_FAILED,
-
     // When client explicitly call disconnect.
-    CLOSED_BY_CLIENT
+    CLOSED_BY_CLIENT,
+
+    // Connection between client and server is lost.
+    DISCONNECTED,
+
+    // Client is authenticated. They can perform operation with authorized permissions.
+    // This state is not in use as of now.
+    AUTHENTICATED
   }
 
   /**
    * Interface representing the metadata of an entry. It contains entry type and version number.
    * TODO: we will add session ID to entry stats in the future
+   * TODO: Add support for expiry time
    */
   class Stat {
     private final int _version;
     private final EntryMode _entryMode;
+    // The expiry time of a TTL node in milliseconds. The default is -1 for nodes without expiry time.
+    private long _expiryTime;
+
+    // The time when the node is created. Measured in milliseconds since the Unix epoch (January 1, 1970, 00:00:00 UTC).
+    private long _creationTime;
+
+    // The time when the node was las modified. Measured in milliseconds since the Unix epoch when the node was last modified.
+    private long _modifiedTime;
 
     public EntryMode getEntryType() {
       return _entryMode;
@@ -88,9 +104,30 @@ public interface MetaClientInterface<T> {
       return _version;
     }
 
+    public long getExpiryTime() {
+      return _expiryTime;
+    }
+
+    public long getCreationTime() {
+      return _creationTime;
+    }
+
+    public long getModifiedTime() {
+      return _modifiedTime;
+    }
+
     public Stat (EntryMode mode, int version) {
       _version = version;
       _entryMode = mode;
+      _expiryTime = -1;
+    }
+
+    public Stat (EntryMode mode, int version, long ctime, long mtime, long etime) {
+      _version = version;
+      _entryMode = mode;
+      _creationTime = ctime;
+      _modifiedTime = mtime;
+      _expiryTime = etime;
     }
   }
 
@@ -113,7 +150,23 @@ public interface MetaClientInterface<T> {
    */
   void create(final String key, final T data, final EntryMode mode);
 
-  // TODO: add TTL create and renew API
+  /**
+   * Create an entry of given EntryMode with given key, data, and expiry time (ttl).
+   * The entry will automatically purge when reached expiry time and has no children.
+   * The entry will not be created if there is an existing entry with the same key.
+   * @param key key to identify the entry
+   * @param data value of the entry
+   * @param ttl Time-to-live value of the node in milliseconds.
+   */
+  void createWithTTL(final String key, final T data, final long ttl);
+
+  /**
+   * Renews the specified TTL node adding its original expiry time
+   * to the current time. Throws an exception if the key is not a valid path
+   * or isn't of type TTL.
+   * @param key key to identify the entry
+   */
+  void renewTTLNode(final String key);
 
   /**
    * Set the data for the entry of the given key if it exists and the given version matches the
@@ -150,7 +203,7 @@ public interface MetaClientInterface<T> {
 
   /**
    * API for transaction. The list of operation will be executed as an atomic operation.
-   * @param ops a list of operations. These operations will all be executed or non of them.
+   * @param ops a list of operations. These operations will all be executed or none of them.
    * @return Return a list of OpResult.
    */
   List<OpResult> transactionOP(final Iterable<Op> ops);
