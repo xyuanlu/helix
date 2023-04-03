@@ -195,7 +195,9 @@ public class TestAlertingRebalancerFailure extends ZkStandAloneCMTestBase {
     IdealState is =
         _gSetupTool.getClusterManagementTool().getResourceIdealState(CLUSTER_NAME, testDb);
     is.setInstanceGroupTag("RandomTag");
+    System.out.println("updating IS.........");
     _gSetupTool.getClusterManagementTool().setResourceIdealState(CLUSTER_NAME, testDb, is);
+    System.out.println("updated IS");
     _gSetupTool.rebalanceStorageCluster(CLUSTER_NAME, testDb, 3);
 
     // Verify there is rebalance error logged
@@ -306,6 +308,7 @@ public class TestAlertingRebalancerFailure extends ZkStandAloneCMTestBase {
       try {
         Long value =
             (Long) _server.getAttribute(getMbeanName(CLUSTER_NAME), "RebalanceFailureGauge");
+       // System.out.println("value " + value + "expected " +expectFailure);
         return value != null && (value == 1) == expectFailure;
       } catch (Exception e) {
         return false;

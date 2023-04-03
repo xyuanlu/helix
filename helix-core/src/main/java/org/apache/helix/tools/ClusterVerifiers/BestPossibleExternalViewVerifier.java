@@ -261,6 +261,7 @@ public class BestPossibleExternalViewVerifier extends ZkHelixClusterVerifier {
         if (!_expectLiveInstances.equals(actualLiveNodes)) {
           LOG.warn("Live instances are not as expected. Actual live nodes: " + actualLiveNodes
               .toString());
+          System.out.println("_expectLiveInstances");
           return false;
         }
       }
@@ -334,6 +335,7 @@ public class BestPossibleExternalViewVerifier extends ZkHelixClusterVerifier {
           LOG.error(
               "State model definition " + is.getStateModelDefRef() + " for resource not found!" + is
                   .getResourceName());
+          System.out.println(resourceName + " stateModelDef");
           return false;
         }
 
@@ -347,12 +349,14 @@ public class BestPossibleExternalViewVerifier extends ZkHelixClusterVerifier {
             LOG.warn("verifyExternalView fails for " + resourceName
                 + "! ExternalView does not match BestPossibleState");
           }
+         // System.out.println(resourceName + " verifyExternalView");
           return false;
         }
       }
       return true;
     } catch (Exception e) {
       LOG.error("exception in verification", e);
+      System.out.println("exception in verification " + e);
       return false;
     }
   }
@@ -370,7 +374,19 @@ public class BestPossibleExternalViewVerifier extends ZkHelixClusterVerifier {
     Map<String, Map<String, String>> externalViewMap = externalView.getRecord().getMapFields();
     removeEntryWithIgnoredStates(externalViewMap.entrySet().iterator(), ignoreStates);
 
-    return externalViewMap.equals(bestPossibleStateMap);
+    if (externalViewMap.equals(bestPossibleStateMap)) {
+      return true;
+    } else {
+      for(String key:externalViewMap.keySet()) {
+        if (externalViewMap.get(key) != bestPossibleStateMap.get(key)) {
+          System.out.println("key: " + key);
+          System.out.println("externalViewMap: " + externalViewMap);
+          System.out.println("bestPossibleStateMap: " + bestPossibleStateMap);
+        }
+      }
+
+    }
+    return false;
   }
 
   private void removeEntryWithIgnoredStates(

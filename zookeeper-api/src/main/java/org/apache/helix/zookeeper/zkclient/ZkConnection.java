@@ -262,7 +262,7 @@ public class ZkConnection implements IZkConnection {
   @Override
   public void removeWatches(String path, Watcher watcher, Watcher.WatcherType watcherType)
       throws InterruptedException, KeeperException {
-    _zk.removeWatches(path, watcher, watcherType, true);
+    _zk.removeWatches(path, watcher, watcherType, false);
   }
 
   private Method doLookUpGetChildrenMethod() {

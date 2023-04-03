@@ -289,7 +289,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
   @Override
   public boolean subscribeDataChange(String key, DataChangeListener listener, boolean skipWatchingNonExistNode) {
     _zkClient.subscribeDataChanges(key, new DataListenerAdapter(listener));
-    return false;
+    return true;
   }
 
   @Override

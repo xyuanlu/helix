@@ -181,10 +181,15 @@ public abstract class MessageDispatchStage extends AbstractBaseStage {
         }
       }
 
+      System.out.println("Sending message "+ message.getMsgId() + " to " + message.getTgtName() + " transit "
+          + message.getResourceName() + "." + message.getPartitionName() + "|" + message
+          .getPartitionNames() + " from:" + message.getFromState() + " to:" + message
+          .getToState());
       keys.add(keyBuilder.message(message.getTgtName(), message.getId()));
     }
 
     boolean[] results = dataAccessor.createChildren(keys, new ArrayList<>(messages));
+
     for (int i = 0; i < results.length; i++) {
       if (!results[i]) {
         LogUtil.logError(logger, _eventId, "Failed to send message: " + keys.get(i));

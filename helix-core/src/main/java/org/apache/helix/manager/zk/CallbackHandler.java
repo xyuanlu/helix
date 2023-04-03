@@ -348,6 +348,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
     // potential improvement candidate.
     synchronized (_manager) {
       if (_changeType == IDEAL_STATE) {
+        System.out.println("_changeType == IDEAL_STATE");
         IdealStateChangeListener idealStateChangeListener = (IdealStateChangeListener) _listener;
         List<IdealState> idealStates = preFetch(_propertyKey);
         idealStateChangeListener.onIdealStateChange(idealStates, changeContext);
@@ -394,6 +395,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
         liveInstanceChangeListener.onLiveInstanceChange(liveInstances, changeContext);
 
       } else if (_changeType == CURRENT_STATE) {
+        System.out.println("_changeType == CURRENT_STATE");
         CurrentStateChangeListener currentStateChangeListener =
             (CurrentStateChangeListener) _listener;
         String instanceName = PropertyPathConfig.getInstanceNameFromPath(_path);

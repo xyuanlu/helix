@@ -235,6 +235,7 @@ public class HelixStateTransitionHandler extends MessageHandler {
               bucketizer.getBucketName(partitionKey)) : accessor.keyBuilder()
           .currentState(instanceName, sessionId, resource, bucketizer.getBucketName(partitionKey));
       if (_message.getAttribute(Attributes.PARENT_MSG_ID) == null) {
+        System.out.println("Update cs: " + resource + " partition " + partitionKey + " instance: " + instanceName  +  "state: " + _currentStateDelta.getState(partitionKey));
         // normal message
         if (!accessor.updateProperty(key, _currentStateDelta)) {
           throw new HelixException(
