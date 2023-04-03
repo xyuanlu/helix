@@ -1262,9 +1262,9 @@ public class ZkClient implements Watcher {
 
   @Override
   public void process(WatchedEvent event) {
-    System.out.println(
-        "zkClient-process: " + event.getPath() + " type:  " + event.getType() + "client : " + this
-            .toString());
+    //System.out.println(
+    //    "zkClient-process: " + event.getPath() + " type:  " + event.getType() + "client : " + this
+    //        .toString());
     long notificationTime = System.currentTimeMillis();
     if (LOG.isDebugEnabled()) {
       LOG.debug("zkclient {}, Received event: {} ", _uid, event);
