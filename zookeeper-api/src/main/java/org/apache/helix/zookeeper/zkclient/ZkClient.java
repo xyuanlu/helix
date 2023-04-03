@@ -2954,7 +2954,7 @@ public class ZkClient implements Watcher {
   }
 
   private void addDataListener(String path, IZkDataListener listener) {
-    System.out.println("addDataListener: " + path + " client " + this + " listener " + listener);
+    //System.out.println("addDataListener: " + path + " client " + this + " listener " + listener);
     Set<IZkDataListenerEntry> listenerEntries;
     listenerEntries = _dataListener.get(path);
     if (listenerEntries == null) {
@@ -2975,7 +2975,7 @@ public class ZkClient implements Watcher {
 
   private void removeDataListener(String path, IZkDataListener dataListener) {
     final Set<IZkDataListenerEntry> listeners = _dataListener.get(path);
-    System.out.println("removeDataListener: " + path);
+    //System.out.println("removeDataListener: " + path);
     if (listeners != null) {
       IZkDataListenerEntry listenerEntry = new IZkDataListenerEntry(dataListener);
       listeners.remove(listenerEntry);
@@ -2998,7 +2998,7 @@ public class ZkClient implements Watcher {
       IZkDataListener dataListener, boolean isDataListener) {
     _persistListenerMutex.lock();
     try {
-      System.out.println("adding listsner: " + path + "isData?" + isDataListener + " this " + this);
+      //System.out.println("adding listsner: " + path + "isData?" + isDataListener + " this " + this);
       if (!isDataListener) {
         addChildListener(path, childlistener);
       } else if (isDataListener) {
@@ -3024,7 +3024,7 @@ public class ZkClient implements Watcher {
   private void removePersistListener(String path, IZkChildListener childlistener,
       IZkDataListener dataListener, boolean isDataListener) {
     _persistListenerMutex.lock();
-    System.out.println("Request to remove listener on Path: " + path);
+    //System.out.println("Request to remove listener on Path: " + path);
     try {
       if (!isDataListener) {
         removeChildListener(path, childlistener);
@@ -3033,7 +3033,7 @@ public class ZkClient implements Watcher {
       }
       if (!hasListeners(path)) {
         // TODO: update hasListeners logic when recursive persist listener is added
-        System.out.println("remove persist watcher for path " + path);
+        //System.out.println("remove persist watcher for path " + path);
         getConnection().removeWatches(path, this, WatcherType.Any);
       }
     } catch (KeeperException | InterruptedException ex) {

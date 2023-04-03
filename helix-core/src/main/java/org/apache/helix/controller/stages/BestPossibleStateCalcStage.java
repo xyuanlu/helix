@@ -404,8 +404,8 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
         rebalancer.init(manager);
         idealState =
             rebalancer.computeNewIdealState(resourceName, idealState, currentStateOutput, cache);
-          System.out.println("new getIdealState : " + resourceName);
-          System.out.println(idealState.getPreferenceLists());
+         // System.out.println("new getIdealState : " + resourceName);
+          //System.out.println(idealState.getPreferenceLists());
 
         // Check if calculation is done successfully
         if (!checkBestPossibleStateCalculation(idealState)) {
