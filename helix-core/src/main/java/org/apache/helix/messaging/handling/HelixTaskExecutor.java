@@ -909,7 +909,7 @@ public class HelixTaskExecutor implements MessageListener, TaskExecutor {
     Set<String> createCurStateNames = new HashSet<>();
 
     for (Message message : messages) {
-      System.out.println("Handling message: " + message.toString());
+      //System.out.println("Handling message: " + message.toString());
       if (checkAndProcessNoOpMessage(message, instanceName, changeContext, manager, sessionId,
           stateTransitionHandlers)) {
         // skip the following operations for the no-op messages.
