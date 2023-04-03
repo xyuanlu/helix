@@ -181,10 +181,10 @@ public abstract class MessageDispatchStage extends AbstractBaseStage {
         }
       }
 
-      System.out.println("Sending message "+ message.getMsgId() + " to " + message.getTgtName() + " transit "
+      /*System.out.println("Sending message "+ message.getMsgId() + " to " + message.getTgtName() + " transit "
           + message.getResourceName() + "." + message.getPartitionName() + "|" + message
           .getPartitionNames() + " from:" + message.getFromState() + " to:" + message
-          .getToState());
+          .getToState());*/
       keys.add(keyBuilder.message(message.getTgtName(), message.getId()));
     }
 

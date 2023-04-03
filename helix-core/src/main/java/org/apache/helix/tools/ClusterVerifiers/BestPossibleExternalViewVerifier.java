@@ -377,13 +377,13 @@ public class BestPossibleExternalViewVerifier extends ZkHelixClusterVerifier {
     if (externalViewMap.equals(bestPossibleStateMap)) {
       return true;
     } else {
-      for(String key:externalViewMap.keySet()) {
+      /*for(String key:externalViewMap.keySet()) {
         if (externalViewMap.get(key) != bestPossibleStateMap.get(key)) {
           System.out.println("key: " + key);
           System.out.println("externalViewMap: " + externalViewMap);
           System.out.println("bestPossibleStateMap: " + bestPossibleStateMap);
         }
-      }
+      }*/
 
     }
     return false;

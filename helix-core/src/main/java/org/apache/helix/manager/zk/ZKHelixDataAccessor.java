@@ -162,7 +162,7 @@ public class ZKHelixDataAccessor implements HelixDataAccessor {
         }
       } else {
         success = _baseDataAccessor.set(path, value.getRecord(), options);
-        System.out.println("setProperty path:" + path + "Succeded "+ success);
+        //System.out.println("setProperty path:" + path + "Succeded "+ success);
       }
       break;
     default:

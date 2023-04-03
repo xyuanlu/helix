@@ -206,7 +206,7 @@ public abstract class ZkHelixClusterVerifier
       long start = System.currentTimeMillis();
       boolean success;
       do {
-        System.out.println("verifyByPolling.....");
+        //System.out.println("verifyByPolling.....");
         success = verifyState();
         if (success) {
           return true;
@@ -302,7 +302,7 @@ public abstract class ZkHelixClusterVerifier
     @Override
     public void run() {
       try {
-        System.out.println("get VerifyStateCallbackTask");
+        //System.out.println("get VerifyStateCallbackTask");
         boolean success = verifyState();
         if (success) {
           _countdown.countDown();
@@ -316,7 +316,7 @@ public abstract class ZkHelixClusterVerifier
   @Override
   @PreFetch(enabled = false)
   public void handleDataChange(String dataPath, Object data) throws Exception {
-    System.out.println("data change: " + dataPath);
+    //System.out.println("data change: " + dataPath);
     if (!_verifyTaskThreadPool.isShutdown()) {
       _verifyTaskThreadPool.submit(new VerifyStateCallbackTask());
     }
@@ -333,7 +333,7 @@ public abstract class ZkHelixClusterVerifier
   @Override
   public void handleChildChange(String parentPath, List<String> currentChilds) throws Exception {
     for (String child : currentChilds) {
-      System.out.println("child change: " + parentPath);
+     // System.out.println("child change: " + parentPath);
       String childPath = String.format("%s/%s", parentPath, child);
       _zkClient.subscribeDataChanges(childPath, this);
     }

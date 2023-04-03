@@ -376,9 +376,9 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
       idealState = new IdealState(resourceName);
       idealState.setStateModelDefRef(resource.getStateModelDefRef());
     } else {
-      System.out.println("cache.getIdealState : " + resourceName);
+      /*System.out.println("cache.getIdealState : " + resourceName);
       System.out.println(idealState.getPreferenceLists());
-      System.out.println(currentStateOutput.getCurrentStateMap(resourceName));
+      System.out.println(currentStateOutput.getCurrentStateMap(resourceName));*/
     }
 
     // Skip resources are tasks for regular pipeline
