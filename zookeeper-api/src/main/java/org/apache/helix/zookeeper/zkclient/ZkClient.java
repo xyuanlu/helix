@@ -20,10 +20,13 @@ package org.apache.helix.zookeeper.zkclient;
  */
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -37,6 +40,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.management.JMException;
 
 import org.apache.helix.zookeeper.api.client.ChildrenSubscribeResult;
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.SessionAwareZNRecord;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -143,6 +147,7 @@ public class ZkClient implements Watcher {
 
   boolean _usePersistWatcher = true; //false;
   private Lock _persistListenerMutex;
+  int count_event = 0;
 
   private class IZkDataListenerEntry {
     final IZkDataListener _dataListener;
@@ -271,6 +276,13 @@ public class ZkClient implements Watcher {
       {
     if (_usePersistWatcher) {
       addPersistListener(path, listener, null, false);
+      try{
+        System.out.println("current ZK watcher:");
+        getZkWatch(this);
+      } catch (Exception ex)
+      {
+        System.out.println(ex);
+      }
     } else {
       synchronized (_childListener) {
         addChildListener(path, listener);
@@ -302,23 +314,43 @@ public class ZkClient implements Watcher {
     System.out.println("try to subscribeDataChanges " + path + " skip?" + skipWatchingNonExistNode);
     if (_usePersistWatcher) {
       addPersistListener(path, null, listener, true);
+      try{
+        System.out.println("current ZK watcher:");
+        getZkWatch(this);
+      } catch (Exception ex)
+      {
+        System.out.println(ex);
+      }
     } else {
       synchronized (_dataListener) {
         addDataListener(path, listener);
       }
     }
 
+    try {
+      getConnection().addWatch(path, ZkClient.this, AddWatchMode.PERSISTENT);
+    } catch (KeeperException e) {
+      e.printStackTrace();
+      System.out.println("fail to add");
+      return false;
+    } catch (InterruptedException e) {
+      System.out.println("fail to add");
+      e.printStackTrace();
+      return false;
+    }
+    /*
     boolean watchInstalled = watchForData(path, skipWatchingNonExistNode);
     if (!watchInstalled) {
       // Now let us remove this handler.
       unsubscribeDataChanges(path, listener);
       LOG.info("zkclient {} watchForData failed to install no-existing path and thus add listener. Path: {}", _uid, path);
       return false;
-    }
+    }*/
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("zkclient {}, Subscribed data changes for {}", _uid, path);
     }
+    System.out.println("added");
     return true;
   }
 
@@ -1262,9 +1294,12 @@ public class ZkClient implements Watcher {
 
   @Override
   public void process(WatchedEvent event) {
-    //System.out.println(
-    //    "zkClient-process: " + event.getPath() + " type:  " + event.getType() + "client : " + this
-    //        .toString());
+    if (event.getType() == EventType.NodeDataChanged) {
+      count_event++;
+    }
+    System.out.println(
+        "zkClient-process: " + event.getPath() + " type:  " + event.getType() + " count: " + count_event + "client : " + this
+            .toString() );
     long notificationTime = System.currentTimeMillis();
     if (LOG.isDebugEnabled()) {
       LOG.debug("zkclient {}, Received event: {} ", _uid, event);
@@ -2431,6 +2466,8 @@ public class ZkClient implements Watcher {
   private boolean watchForData(final String path, boolean skipWatchingNonExistNode) {
     try {
       if (_usePersistWatcher) {
+
+        return true;/*
         return retryUntilConnected(new Callable<Boolean>() {
           @Override
           public Boolean call() throws Exception {
@@ -2440,7 +2477,7 @@ public class ZkClient implements Watcher {
             //}
             // return false;
           }
-        });
+        });*/
       } else {
         if (skipWatchingNonExistNode) {
           retryUntilConnected(() -> (((ZkConnection) getConnection()).getZookeeper().getData(path, true, new Stat())));
@@ -2995,18 +3032,18 @@ public class ZkClient implements Watcher {
   }
 
   private void addPersistListener(String path, IZkChildListener childlistener,
-      IZkDataListener dataListener, boolean isDataListener) {
+      IZkDataListener dataListener, boolean isDataListener)  {
     _persistListenerMutex.lock();
     try {
-      //System.out.println("adding listsner: " + path + "isData?" + isDataListener + " this " + this);
+      System.out.println("adding listsner: " + path + "isData?" + isDataListener + " this " + this);
       if (!isDataListener) {
         addChildListener(path, childlistener);
       } else if (isDataListener) {
         addDataListener(path, dataListener);
       }
     } finally {
-
       _persistListenerMutex.unlock();
+      System.out.println("release lock in addPersistListener");
     }
   }
 
@@ -3024,7 +3061,7 @@ public class ZkClient implements Watcher {
   private void removePersistListener(String path, IZkChildListener childlistener,
       IZkDataListener dataListener, boolean isDataListener) {
     _persistListenerMutex.lock();
-    //System.out.println("Request to remove listener on Path: " + path);
+    System.out.println("Request to remove listener on Path: " + path);
     try {
       if (!isDataListener) {
         removeChildListener(path, childlistener);
@@ -3039,8 +3076,76 @@ public class ZkClient implements Watcher {
     } catch (KeeperException | InterruptedException ex) {
       throw new ZkException(ex);
     } finally {
+      System.out.println("release lock in removePersistListener");
       _persistListenerMutex.unlock();
     }
+  }
+
+
+  static java.lang.reflect.Field getField(Class clazz, String fieldName)
+      throws NoSuchFieldException {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      Class superClass = clazz.getSuperclass();
+      if (superClass == null) {
+        throw e;
+      } else {
+        return getField(superClass, fieldName);
+      }
+    }
+  }
+
+  public static Map<String, List<String>> getZkWatch(ZkClient client)
+      throws Exception {
+    Map<String, List<String>> lists = new HashMap<String, List<String>>();
+    ZkClient zkClient = client;
+
+    ZkConnection connection = ((ZkConnection) zkClient.getConnection());
+    ZooKeeper zk = connection.getZookeeper();
+
+    java.lang.reflect.Field field = getField(zk.getClass(), "watchManager");
+    field.setAccessible(true);
+    Object watchManager = field.get(zk);
+
+    java.lang.reflect.Field field2 = getField(watchManager.getClass(), "dataWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> dataWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "existWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> existWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "childWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> childWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "persistentWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> persistentWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+    for(String key : persistentWatches.keySet()) {
+      System.out.println("key :" + key);
+      System.out.println("watchers: " + persistentWatches.get(key));
+    }
+
+
+    field2 = getField(watchManager.getClass(), "persistentRecursiveWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> persistentRecursiveWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+
+    lists.put("dataWatches", new ArrayList<>(dataWatches.keySet()));
+    lists.put("existWatches", new ArrayList<>(existWatches.keySet()));
+    lists.put("childWatches", new ArrayList<>(childWatches.keySet()));
+    lists.put("persistentWatches", new ArrayList<>(persistentWatches.keySet()));
+    lists.put("persistentRecursiveWatches", new ArrayList<>(persistentRecursiveWatches.keySet()));
+
+    return lists;
   }
 
 }

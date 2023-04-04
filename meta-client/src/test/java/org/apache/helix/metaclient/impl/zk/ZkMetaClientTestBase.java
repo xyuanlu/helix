@@ -32,7 +32,7 @@ import org.testng.annotations.BeforeSuite;
 
 public abstract class ZkMetaClientTestBase {
 
-  protected static final String ZK_ADDR = "localhost:2183";
+  protected static final String ZK_ADDR = "localhost:2121";
   protected static final int DEFAULT_TIMEOUT_MS = 1000;
   protected static final String ENTRY_STRING_VALUE = "test-value";
   private static ZkServer _zkServer;
@@ -52,12 +52,12 @@ public abstract class ZkMetaClientTestBase {
     // Enable extended types and create a ZkClient
     System.setProperty("zookeeper.extendedTypesEnabled", "true");
     // start local zookeeper server
-    _zkServer = startZkServer(ZK_ADDR);
+    //_zkServer = startZkServer(ZK_ADDR);
   }
 
   @AfterSuite
   public void cleanUp() {
-    _zkServer.shutdown();
+    //_zkServer.shutdown();
   }
 
   protected static ZkMetaClient<String> createZkMetaClient() {

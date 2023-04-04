@@ -70,7 +70,7 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
 
   @Override
   public void process(ClusterEvent event) throws Exception {
-   // System.out.println("BestPossibleStateCalcStage - process");
+    System.out.println("BestPossibleStateCalcStage - process");
     _eventId = event.getEventId();
     CurrentStateOutput currentStateOutput = event.getAttribute(AttributeName.CURRENT_STATE.name());
     final Map<String, Resource> resourceMap =

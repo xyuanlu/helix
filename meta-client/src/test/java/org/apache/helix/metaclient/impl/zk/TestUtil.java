@@ -79,6 +79,10 @@ public class TestUtil {
     field2.setAccessible(true);
     HashMap<String, Set<Watcher>> persistentWatches =
         (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+    for(String key : persistentWatches.keySet()) {
+      System.out.println("key :" + key);
+      System.out.println("watchers: " + persistentWatches.get(key));
+    }
 
     field2 = getField(watchManager.getClass(), "persistentRecursiveWatches");
     field2.setAccessible(true);

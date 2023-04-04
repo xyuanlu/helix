@@ -68,7 +68,7 @@ public class ZkTestBase {
     System.setProperty("zookeeper.4lw.commands.whitelist", "*");
 
     // Set up in-memory ZooKeepers
-    setupZooKeepers();
+    //setupZooKeepers();
 
     // Clean up all JMX objects
     for (ObjectName mbean : MBEAN_SERVER.queryNames(null, null)) {
@@ -92,7 +92,7 @@ public class ZkTestBase {
     }
 
     // Shut down all ZkServers
-    _zkServerMap.values().forEach(ZkServer::shutdown);
+   // _zkServerMap.values().forEach(ZkServer::shutdown);
   }
 
   private void setupZooKeepers() {

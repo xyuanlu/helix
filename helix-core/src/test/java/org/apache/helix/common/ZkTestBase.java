@@ -111,7 +111,7 @@ public class ZkTestBase {
   private Map<String, Map<String, HelixZkClient>> _liveInstanceOwners = new HashMap<>();
 
   private static final String ZK_PREFIX = "localhost:";
-  private static final int ZK_START_PORT = 2183;
+  private static final int ZK_START_PORT = 2121; //2183;
   public static final String ZK_ADDR = ZK_PREFIX + ZK_START_PORT;
   protected static final String CLUSTER_PREFIX = "CLUSTER";
   protected static final String CONTROLLER_CLUSTER_PREFIX = "CONTROLLER_CLUSTER";
@@ -198,8 +198,8 @@ public class ZkTestBase {
   private void startZooKeeper(int i)
       throws Exception {
     String zkAddress = ZK_PREFIX + (ZK_START_PORT + i);
-    ZkServer zkServer = TestHelper.startZkServer(zkAddress);
-    AssertJUnit.assertNotNull(zkServer);
+    //ZkServer zkServer = TestHelper.startZkServer(zkAddress);
+    //AssertJUnit.assertNotNull(zkServer);
     HelixZkClient.ZkClientConfig clientConfig = new HelixZkClient.ZkClientConfig();
     clientConfig.setZkSerializer(new ZNRecordSerializer());
     HelixZkClient zkClient = DedicatedZkClientFactory.getInstance()
@@ -207,7 +207,7 @@ public class ZkTestBase {
     ClusterSetup gSetupTool = new ClusterSetup(zkClient);
     BaseDataAccessor baseDataAccessor = new ZkBaseDataAccessor<>(zkClient);
 
-    _zkServerMap.put(zkAddress, zkServer);
+    //_zkServerMap.put(zkAddress, zkServer);
     _helixZkClientMap.put(zkAddress, zkClient);
     _clusterSetupMap.put(zkAddress, gSetupTool);
     _baseDataAccessorMap.put(zkAddress, baseDataAccessor);
@@ -226,7 +226,7 @@ public class ZkTestBase {
 
     // Close all ZK resources
     _baseDataAccessorMap.values().forEach(BaseDataAccessor::close);
-    _clusterSetupMap.values().forEach(ClusterSetup::close);
+   // _clusterSetupMap.values().forEach(ClusterSetup::close);
     _helixZkClientMap.values().forEach(HelixZkClient::close);
     _zkServerMap.values().forEach(TestHelper::stopZkServer);
   }

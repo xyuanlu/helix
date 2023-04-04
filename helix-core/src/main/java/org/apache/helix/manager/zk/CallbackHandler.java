@@ -347,9 +347,9 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
     // TODO: Maybe we don't need to sync on _manager for all types of listener. PCould be a
     // potential improvement candidate.
     synchronized (_manager) {
-      //System.out.println(
-      //    "START: CallbackHandler " + _uid + ", INVOKE " + _path + " listener: " + _listener
-      //        + " type:  " + type);
+      System.out.println(
+          "START: CallbackHandler " + _uid + ", INVOKE " + _path + " listener: " + _listener
+              + " type:  " + type);
       if (_changeType == IDEAL_STATE) {
         System.out.println("_changeType == IDEAL_STATE");
         IdealStateChangeListener idealStateChangeListener = (IdealStateChangeListener) _listener;
