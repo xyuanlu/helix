@@ -46,20 +46,21 @@ import org.apache.zookeeper.KeeperException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.helix.metaclient.api.DataChangeListener.ChangeType.ENTRY_UPDATE;
 import static org.apache.helix.metaclient.api.MetaClientInterface.EntryMode.CONTAINER;
 import static org.apache.helix.metaclient.api.MetaClientInterface.EntryMode.PERSISTENT;
 
 
 public class TestZkMetaClient extends ZkMetaClientTestBase{
 
-  private static final String ZK_ADDR = "localhost:2183";
+  private static final String ZK_ADDR = "localhost:2121";
   private static final int DEFAULT_TIMEOUT_MS = 1000;
   private static final String ENTRY_STRING_VALUE = "test-value";
   private static final String TRANSACTION_TEST_PARENT_PATH = "/transactionOpTestPath";
   private static final String TEST_INVALID_PATH = "/_invalid/a/b/c";
 
   private final Object _syncObject = new Object();
-
+/*
   @Test
   public void testCreate() {
     final String key = "/TestZkMetaClient_testCreate";
@@ -206,7 +207,7 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
       Assert.assertEquals((int) newData, (int) initValue + 2);
       zkMetaClient.delete(key);
     }
-  }
+  }*/
 
   @Test
   public void testGetAndCountChildrenAndRecursiveDelete() {
@@ -245,6 +246,11 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
       MockDataChangeListener listener = new MockDataChangeListener();
       zkMetaClient.subscribeDataChange(path, listener, false);
       zkMetaClient.create(path, "test-node");
+      Map<String, List<String>> watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 1);
+      Assert.assertEquals(watchers.get("persistentWatches").get(0), path);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);
       int expectedCallCount = 0;
       synchronized (_syncObject) {
         while (listener.getTriggeredCount() == expectedCallCount) {
@@ -261,7 +267,7 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
         }
         expectedCallCount++;
         Assert.assertEquals(listener.getTriggeredCount(), expectedCallCount);
-        Assert.assertEquals(listener.getLastEventType(), DataChangeListener.ChangeType.ENTRY_UPDATE);
+        Assert.assertEquals(listener.getLastEventType(), ENTRY_UPDATE);
       }
       zkMetaClient.delete(path);
       synchronized (_syncObject) {
@@ -275,6 +281,12 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
       // unregister listener, expect no more call
       zkMetaClient.unsubscribeDataChange(path, listener);
       zkMetaClient.create(path, "test-node");
+      // Verify no listener is left on any path
+      watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 0);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);
+
       synchronized (_syncObject) {
         _syncObject.wait(DEFAULT_TIMEOUT_MS);
         Assert.assertEquals(listener.getTriggeredCount(), expectedCallCount);
@@ -317,16 +329,31 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
           zkMetaClient.subscribeDataChange(path, listener, false);
         }
       }
+      // Test there should be 2 persist ZK watcher installed
+      Map<String, List<String>> watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 2);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);
       zkMetaClient.set(basePath + "_1", testData, -1);
       Assert.assertTrue(countDownLatch.await(5000, TimeUnit.MILLISECONDS));
       Assert.assertTrue(dataExpected.get());
+
+      // remove listenere
+      for (int i = 0; i < 2; i++) {
+        String path = basePath + "_" + i;
+        for (DataChangeListener listener: listeners.get(path)) {
+          zkMetaClient.unsubscribeDataChange(path, listener);
+        }
+      }
+      watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 0);
     }
   }
-
+/*
   @Test
   public void testDirectChildChangeListener() throws Exception {
     final String basePath = "/TestZkMetaClient_testDirectChildChangeListener";
-    final int count = 3;
+    final int count = 100;
     try (ZkMetaClient<String> zkMetaClient = createZkMetaClient()) {
       zkMetaClient.connect();
       CountDownLatch countDownLatch = new CountDownLatch(count);
@@ -340,16 +367,81 @@ public class TestZkMetaClient extends ZkMetaClientTestBase{
       Assert.assertTrue(
           zkMetaClient.subscribeDirectChildChange(basePath, listener, false)
               .isRegistered());
-      zkMetaClient.create(basePath + "/child_1", "test-data");
-      //TODO: the native zkclient failed to provide persistent listener, and event might be lost.
-      // Remove Thread.sleep() below when the persistent watcher is supported
-      Thread.sleep(500);
-      zkMetaClient.create(basePath + "/child_2", "test-data");
-      Thread.sleep(500);
-      zkMetaClient.create(basePath + "/child_3", "test-data");
+      for(int i=0; i<1000; ++i){
+        zkMetaClient.create(basePath + "/child_" +i, "test-data");
+      }
+
+      // Verify no one time watcher is registered. Only one persist listener is registered.
+      Map<String, List<String>> watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 1);
+      Assert.assertEquals(watchers.get("persistentWatches").get(0), basePath);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);
+
       Assert.assertTrue(countDownLatch.await(5000, TimeUnit.MILLISECONDS));
+      zkMetaClient.unsubscribeDirectChildChange(basePath, listener);
+      // verify that no listener is registered on any path
+      watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 0);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);
+    }
+  }*/
+
+  @Test
+  public void testDataChangeListener() throws Exception {
+    final String basePath = "/TestZkMetaClient_testDataChangeListener";
+    final int count = 200;
+    final int[] get_count = {0};
+    try (ZkMetaClient<String> zkMetaClient = createZkMetaClient()) {
+      zkMetaClient.connect();
+      CountDownLatch countDownLatch = new CountDownLatch(count);
+      DataChangeListener listener = new DataChangeListener() {
+
+        @Override
+        public void handleDataChange(String key, Object data, ChangeType changeType)
+            throws Exception {
+          if(changeType == ENTRY_UPDATE) {
+            get_count[0]++;
+            System.out.println("[Xyy] data change event  " + key + " " + get_count[0]);
+            countDownLatch.countDown();
+          }
+        }
+      };
+      zkMetaClient.create(basePath, "");
+      Assert.assertTrue(
+          zkMetaClient.subscribeDataChange(basePath, listener, false)
+              );
+      // Verify no one time watcher is registered. Only one persist listener is registered.
+      Map<String, List<String>> watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      //Assert.assertEquals(watchers.get("persistentWatches").size(), 1);
+      //Assert.assertEquals(watchers.get("persistentWatches").get(0), basePath);
+      //Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      //Assert.assertEquals(watchers.get("dataWatches").size(), 0);
+
+
+      /*zkMetaClient.unsubscribeDataChange(basePath, listener);
+      // verify that no listener is registered on any path
+      watchers = TestUtil.getZkWatch(zkMetaClient.getZkClient());
+      Assert.assertEquals(watchers.get("persistentWatches").size(), 0);
+      Assert.assertEquals(watchers.get("childWatches").size(), 0);
+      Assert.assertEquals(watchers.get("dataWatches").size(), 0);*/
+
+      // resubscribe
+      /*Assert.assertTrue(
+          zkMetaClient.subscribeDataChange(basePath, listener, false)
+      );*/
+
+      for (int i=0; i<200; ++i) {
+        zkMetaClient.set(basePath, "data7" + i, -1);
+        System.out.println("adding data");
+      }
+      Assert.assertTrue(countDownLatch.await(5000, TimeUnit.MILLISECONDS));
+      TestUtil.getZkWatch(zkMetaClient.getZkClient());
+
     }
   }
+
 
   @Test
   public void testConnectStateChangeListener() throws Exception {

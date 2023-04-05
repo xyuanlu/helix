@@ -347,7 +347,11 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
     // TODO: Maybe we don't need to sync on _manager for all types of listener. PCould be a
     // potential improvement candidate.
     synchronized (_manager) {
+      System.out.println(
+          "START: CallbackHandler " + _uid + ", INVOKE " + _path + " listener: " + _listener
+              + " type:  " + type);
       if (_changeType == IDEAL_STATE) {
+        System.out.println("_changeType == IDEAL_STATE");
         IdealStateChangeListener idealStateChangeListener = (IdealStateChangeListener) _listener;
         List<IdealState> idealStates = preFetch(_propertyKey);
         idealStateChangeListener.onIdealStateChange(idealStates, changeContext);
@@ -394,6 +398,7 @@ public class CallbackHandler implements IZkChildListener, IZkDataListener {
         liveInstanceChangeListener.onLiveInstanceChange(liveInstances, changeContext);
 
       } else if (_changeType == CURRENT_STATE) {
+        System.out.println("_changeType == CURRENT_STATE");
         CurrentStateChangeListener currentStateChangeListener =
             (CurrentStateChangeListener) _listener;
         String instanceName = PropertyPathConfig.getInstanceNameFromPath(_path);

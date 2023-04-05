@@ -1172,6 +1172,11 @@ public class ZKHelixAdmin implements HelixAdmin {
     PropertyKey.Builder keyBuilder = accessor.keyBuilder();
 
     accessor.setProperty(keyBuilder.idealStates(resourceName), idealState);
+    System.out.println("Set IdealState for resource IS: " + idealState);
+    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+      System.out.println(ste + "\n");
+    }
+
   }
 
   /**

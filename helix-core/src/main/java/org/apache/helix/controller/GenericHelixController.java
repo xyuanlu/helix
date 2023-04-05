@@ -1175,7 +1175,9 @@ public class GenericHelixController implements IdealStateChangeListener, LiveIns
   public void onIdealStateChange(List<IdealState> idealStates, NotificationContext changeContext) {
     logger.info(
         "START: Generic GenericClusterController.onIdealStateChange() for cluster " + _clusterName);
+    System.out.println("START: Generic GenericClusterController.onIdealStateChange() for cluster " + _clusterName);
     notifyCaches(changeContext, ChangeType.IDEAL_STATE);
+    System.out.println("Push to pushToEventQueues " + changeContext);
     pushToEventQueues(ClusterEventType.IdealStateChange, changeContext,
         Collections.<String, Object>emptyMap());
 

@@ -61,6 +61,7 @@ public class ExternalViewComputeStage extends AbstractAsyncBaseStage {
 
   @Override
   public void execute(final ClusterEvent event) throws Exception {
+    System.out.println("ExternalViewComputeStage");
     _eventId = event.getEventId();
     HelixManager manager = event.getAttribute(AttributeName.helixmanager.name());
     Map<String, Resource> resourceMap = event.getAttribute(AttributeName.RESOURCES_TO_REBALANCE.name());

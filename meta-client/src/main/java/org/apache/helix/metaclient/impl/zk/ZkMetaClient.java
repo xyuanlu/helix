@@ -22,6 +22,7 @@ package org.apache.helix.metaclient.impl.zk;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.helix.metaclient.api.AsyncCallback;
 import org.apache.helix.metaclient.api.ChildChangeListener;
@@ -288,7 +289,7 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
   @Override
   public boolean subscribeDataChange(String key, DataChangeListener listener, boolean skipWatchingNonExistNode) {
     _zkClient.subscribeDataChanges(key, new DataListenerAdapter(listener));
-    return false;
+    return true;
   }
 
   @Override
@@ -393,5 +394,10 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
   @Override
   public T deserialize(byte[] bytes, String path) {
     return _zkClient.deserialize(bytes, path);
+  }
+
+  @VisibleForTesting
+  ZkClient getZkClient(){
+    return _zkClient;
   }
 }

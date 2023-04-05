@@ -70,6 +70,7 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
 
   @Override
   public void process(ClusterEvent event) throws Exception {
+    System.out.println("BestPossibleStateCalcStage - process");
     _eventId = event.getEventId();
     CurrentStateOutput currentStateOutput = event.getAttribute(AttributeName.CURRENT_STATE.name());
     final Map<String, Resource> resourceMap =
@@ -175,6 +176,7 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
     // This is required because we support mixed cluster that uses both WAGED rebalancer and the
     // older rebalancers.
     Iterator<Resource> itr = remainingResourceMap.values().iterator();
+    //System.out.println("remainingResourceMap " + remainingResourceMap.values());
     while (itr.hasNext()) {
       Resource resource = itr.next();
       boolean result = false;
@@ -367,11 +369,16 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
     // Ideal state may be gone. In that case we need to get the state model name
     // from the current state
     IdealState idealState = cache.getIdealState(resourceName);
+
     if (idealState == null) {
       // if ideal state is deleted, use an empty one
       LogUtil.logInfo(logger, _eventId, "resource:" + resourceName + " does not exist anymore");
       idealState = new IdealState(resourceName);
       idealState.setStateModelDefRef(resource.getStateModelDefRef());
+    } else {
+      /*System.out.println("cache.getIdealState : " + resourceName);
+      System.out.println(idealState.getPreferenceLists());
+      System.out.println(currentStateOutput.getCurrentStateMap(resourceName));*/
     }
 
     // Skip resources are tasks for regular pipeline
@@ -397,6 +404,8 @@ public class BestPossibleStateCalcStage extends AbstractBaseStage {
         rebalancer.init(manager);
         idealState =
             rebalancer.computeNewIdealState(resourceName, idealState, currentStateOutput, cache);
+         // System.out.println("new getIdealState : " + resourceName);
+          //System.out.println(idealState.getPreferenceLists());
 
         // Check if calculation is done successfully
         if (!checkBestPossibleStateCalculation(idealState)) {

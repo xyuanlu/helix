@@ -20,8 +20,11 @@ package org.apache.helix.zookeeper.zkclient;
  */
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -32,9 +35,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.management.JMException;
 
 import org.apache.helix.zookeeper.api.client.ChildrenSubscribeResult;
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.SessionAwareZNRecord;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -59,6 +65,7 @@ import org.apache.helix.zookeeper.zkclient.serialize.BasicZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.PathBasedZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.ZkSerializer;
 import org.apache.helix.zookeeper.zkclient.util.ExponentialBackoffStrategy;
+import org.apache.zookeeper.AddWatchMode;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
@@ -75,6 +82,7 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * "Native ZkClient": not to be used directly.
@@ -109,7 +117,7 @@ public class ZkClient implements Watcher {
 
   private final IZkConnection _connection;
   private final long _operationRetryTimeoutInMillis;
-  private final Map<String, Set<IZkChildListener>> _childListener = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Set<IZkChildListener>> _childListener = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, Set<IZkDataListenerEntry>> _dataListener =
       new ConcurrentHashMap<>();
   private final Set<IZkStateListener> _stateListener = new CopyOnWriteArraySet<>();
@@ -136,6 +144,10 @@ public class ZkClient implements Watcher {
   // To automatically retry the async operation, we need a separate thread other than the
   // ZkEventThread. Otherwise the retry request might block the normal event processing.
   protected final ZkAsyncRetryThread _asyncCallRetryThread;
+
+  boolean _usePersistWatcher = true; //false;
+  private Lock _persistListenerMutex;
+  int count_event = 0;
 
   private class IZkDataListenerEntry {
     final IZkDataListener _dataListener;
@@ -244,6 +256,7 @@ public class ZkClient implements Watcher {
     if (connectOnInit) {
       connect(connectionTimeout, this);
     }
+    _persistListenerMutex = new ReentrantLock();
   }
 
   protected ZkClient(IZkConnection zkConnection, int connectionTimeout, long operationRetryTimeout,
@@ -253,24 +266,32 @@ public class ZkClient implements Watcher {
         monitorInstanceName, monitorRootPathOnly, true);
   }
 
-  public List<String> subscribeChildChanges(String path, IZkChildListener listener) {
+  public List<String> subscribeChildChanges(String path, IZkChildListener listener)
+       {
     ChildrenSubscribeResult result = subscribeChildChanges(path, listener, false);
     return result.getChildren();
   }
 
-  public ChildrenSubscribeResult subscribeChildChanges(String path, IZkChildListener listener, boolean skipWatchingNonExistNode) {
-    synchronized (_childListener) {
-      Set<IZkChildListener> listeners = _childListener.get(path);
-      if (listeners == null) {
-        listeners = new CopyOnWriteArraySet<>();
-        _childListener.put(path, listeners);
+  public ChildrenSubscribeResult subscribeChildChanges(String path, IZkChildListener listener, boolean skipWatchingNonExistNode)
+      {
+    if (_usePersistWatcher) {
+      addPersistListener(path, listener, null, false);
+      try{
+        System.out.println("current ZK watcher:");
+        getZkWatch(this);
+      } catch (Exception ex)
+      {
+        System.out.println(ex);
       }
-      listeners.add(listener);
+    } else {
+      synchronized (_childListener) {
+        addChildListener(path, listener);
+      }
     }
 
     List<String> children = watchForChilds(path, skipWatchingNonExistNode);
     if (children == null && skipWatchingNonExistNode) {
-      unsubscribeChildChanges(path, listener);
+        unsubscribeChildChanges(path, listener);
       LOG.info("zkclient{}, watchForChilds failed to install no-existing watch and add listener. Path: {}", _uid, path);
       return new ChildrenSubscribeResult(children, false);
     }
@@ -279,46 +300,57 @@ public class ZkClient implements Watcher {
   }
 
   public void unsubscribeChildChanges(String path, IZkChildListener childListener) {
-    synchronized (_childListener) {
-      final Set<IZkChildListener> listeners = _childListener.get(path);
-      if (listeners != null) {
-        listeners.remove(childListener);
+    if (_usePersistWatcher) {
+      removePersistListener(path, childListener, null, false);
+    } else {
+      synchronized (_childListener) {
+        removeChildListener(path, childListener);
       }
     }
   }
 
   public boolean subscribeDataChanges(String path, IZkDataListener listener, boolean skipWatchingNonExistNode) {
-    Set<IZkDataListenerEntry> listenerEntries;
-    synchronized (_dataListener) {
-      listenerEntries = _dataListener.get(path);
-      if (listenerEntries == null) {
-        listenerEntries = new CopyOnWriteArraySet<>();
-        _dataListener.put(path, listenerEntries);
-      }
 
-      boolean prefetchEnabled = isPrefetchEnabled(listener);
-      IZkDataListenerEntry listenerEntry = new IZkDataListenerEntry(listener, prefetchEnabled);
-      listenerEntries.add(listenerEntry);
-      if (prefetchEnabled) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("zkclient {} subscribed data changes for {}, listener {}, prefetch data {}",
-              _uid, path, listener, prefetchEnabled);
-        }
+    System.out.println("try to subscribeDataChanges " + path + " skip?" + skipWatchingNonExistNode);
+    if (_usePersistWatcher) {
+      addPersistListener(path, null, listener, true);
+      try{
+        System.out.println("current ZK watcher:");
+        getZkWatch(this);
+      } catch (Exception ex)
+      {
+        System.out.println(ex);
+      }
+    } else {
+      synchronized (_dataListener) {
+        addDataListener(path, listener);
       }
     }
 
+    try {
+      getConnection().addWatch(path, ZkClient.this, AddWatchMode.PERSISTENT);
+    } catch (KeeperException e) {
+      e.printStackTrace();
+      System.out.println("fail to add");
+      return false;
+    } catch (InterruptedException e) {
+      System.out.println("fail to add");
+      e.printStackTrace();
+      return false;
+    }
+    /*
     boolean watchInstalled = watchForData(path, skipWatchingNonExistNode);
     if (!watchInstalled) {
       // Now let us remove this handler.
       unsubscribeDataChanges(path, listener);
-      LOG.info("zkclient {} watchForData failed to install no-existing path and thus add listener. Path: {}",
-          _uid, path);
+      LOG.info("zkclient {} watchForData failed to install no-existing path and thus add listener. Path: {}", _uid, path);
       return false;
-    }
+    }*/
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("zkclient {}, Subscribed data changes for {}", _uid, path);
     }
+    System.out.println("added");
     return true;
   }
 
@@ -355,14 +387,11 @@ public class ZkClient implements Watcher {
   }
 
   public void unsubscribeDataChanges(String path, IZkDataListener dataListener) {
-    synchronized (_dataListener) {
-      final Set<IZkDataListenerEntry> listeners = _dataListener.get(path);
-      if (listeners != null) {
-        IZkDataListenerEntry listenerEntry = new IZkDataListenerEntry(dataListener);
-        listeners.remove(listenerEntry);
-      }
-      if (listeners == null || listeners.isEmpty()) {
-        _dataListener.remove(path);
+    if (_usePersistWatcher) {
+      removePersistListener(path, null, dataListener, true);
+    } else {
+      synchronized (_dataListener) {
+        removeDataListener(path, dataListener);
       }
     }
   }
@@ -410,11 +439,26 @@ public class ZkClient implements Watcher {
   }
 
   public void unsubscribeAll() {
-    synchronized (_childListener) {
-      _childListener.clear();
-    }
-    synchronized (_dataListener) {
-      _dataListener.clear();
+    if (_usePersistWatcher) {
+      _persistListenerMutex.lock();
+      Set<String> paths = new HashSet<>();
+      _childListener.forEach((k, v) -> paths.add(k));
+      _dataListener.forEach((k, v) -> paths.add(k));
+      paths.forEach(p -> {
+        try {
+          getConnection().removeWatches(p, this, WatcherType.Any);
+        } catch (InterruptedException | KeeperException e) {
+          LOG.info("Failed to remove persistent watcher for {} ", p, e);
+        }
+      });
+      _persistListenerMutex.unlock();
+    } else {
+      synchronized (_childListener) {
+        _childListener.clear();
+      }
+      synchronized (_dataListener) {
+        _dataListener.clear();
+      }
     }
     synchronized (_stateListener) {
       _stateListener.clear();
@@ -1250,15 +1294,27 @@ public class ZkClient implements Watcher {
 
   @Override
   public void process(WatchedEvent event) {
+    if (event.getType() == EventType.NodeDataChanged) {
+      count_event++;
+    }
+    System.out.println(
+        "zkClient-process: " + event.getPath() + " type:  " + event.getType() + " count: " + count_event + "client : " + this
+            .toString() );
     long notificationTime = System.currentTimeMillis();
     if (LOG.isDebugEnabled()) {
       LOG.debug("zkclient {}, Received event: {} ", _uid, event);
     }
     _zookeeperEventThread = Thread.currentThread();
 
+    if (event.getType() == EventType.PersistentWatchRemoved
+        || event.getType() == EventType.ChildWatchRemoved
+        || event.getType() == EventType.DataWatchRemoved) {
+      return;
+    }
     boolean stateChanged = event.getPath() == null;
     boolean sessionExpired = stateChanged && event.getState() == KeeperState.Expired;
-    boolean znodeChanged = event.getPath() != null;
+    boolean znodeChanged =
+        event.getPath() != null && event.getType() != EventType.PersistentWatchRemoved;
     boolean dataChanged =
         event.getType() == EventType.NodeDataChanged || event.getType() == EventType.NodeDeleted
             || event.getType() == EventType.NodeCreated
@@ -1339,7 +1395,7 @@ public class ZkClient implements Watcher {
    * are deleted before the last page is fetched. The upstream caller should be able to handle this.
    */
   public List<String> getChildren(String path) {
-    return getChildren(path, hasListeners(path));
+    return getChildren(path, hasListeners(path) && !_usePersistWatcher);
   }
 
   protected List<String> getChildren(final String path, final boolean watch) {
@@ -1780,6 +1836,7 @@ public class ZkClient implements Watcher {
       final ZkPathStatRecord pathStatRecord = new ZkPathStatRecord(path);
       // Trigger listener callbacks
       for (final IZkDataListenerEntry listener : listeners) {
+        System.out.println("Sending data change event to : " + path);
         _eventThread.send(new ZkEventThread.ZkEvent(
             "Data of " + path + " changed sent to " + listener.getDataListener()
                 + " prefetch data: " + listener.isPrefetchData()) {
@@ -1794,7 +1851,7 @@ public class ZkClient implements Watcher {
               // the exists() useGetData (false) route to check stat. Otherwise, we use getData()
               // to install watch.
               Stat stat = null;
-              if (!pathExists) {
+              if (_usePersistWatcher || !pathExists) {
                 stat = getStat(path, false);
               } else {
                 stat = installWatchOnlyPathExist(path);
@@ -1813,11 +1870,13 @@ public class ZkClient implements Watcher {
                   // TODO: the data is redundantly read multiple times when multiple listeners exist
                   data = readData(path, null, true);
                 } catch (ZkNoNodeException e) {
+                  System.out.println("ZkNoNodeException exception in read data " + path);
                   LOG.warn("zkclient {} Prefetch data for path: {} failed.", _uid, path, e);
                   listener.getDataListener().handleDataDeleted(path);
                   return;
                 }
               }
+              System.out.println("fire data change event to : " + listener);
               listener.getDataListener().handleDataChange(path, data, eventType);
             }
           }
@@ -1836,9 +1895,10 @@ public class ZkClient implements Watcher {
         _eventThread.send(new ZkEventThread.ZkEvent("Children of " + path + " changed sent to " + listener) {
           @Override
           public void run() throws Exception {
+
             if (!pathStatRecord.pathChecked()) {
               Stat stat = null;
-              if (!pathExists || !hasListeners(path)) {
+              if (_usePersistWatcher || !pathExists || !hasListeners(path)) {
                 // will not install listener using exists call
                 stat = getStat(path, false);
               } else {
@@ -2405,10 +2465,25 @@ public class ZkClient implements Watcher {
 
   private boolean watchForData(final String path, boolean skipWatchingNonExistNode) {
     try {
-      if (skipWatchingNonExistNode) {
-        retryUntilConnected(() -> (((ZkConnection) getConnection()).getZookeeper().getData(path, true, new Stat())));
+      if (_usePersistWatcher) {
+
+        return true;/*
+        return retryUntilConnected(new Callable<Boolean>() {
+          @Override
+          public Boolean call() throws Exception {
+            //if (!skipWatchingNonExistNode || exists(path)) {
+            getConnection().addWatch(path, ZkClient.this, AddWatchMode.PERSISTENT);
+            return true;
+            //}
+            // return false;
+          }
+        });*/
       } else {
-        retryUntilConnected(() -> (((ZkConnection) getConnection()).getZookeeper().exists(path, true)));
+        if (skipWatchingNonExistNode) {
+          retryUntilConnected(() -> (((ZkConnection) getConnection()).getZookeeper().getData(path, true, new Stat())));
+        } else {
+          retryUntilConnected(() -> (((ZkConnection) getConnection()).getZookeeper().exists(path, true)));
+        }
       }
     } catch (ZkNoNodeException e) {
       // Do nothing, this is what we want as this is not going to leak watch in ZooKeeepr server.
@@ -2460,11 +2535,18 @@ public class ZkClient implements Watcher {
     return retryUntilConnected(new Callable<List<String>>() {
       @Override
       public List<String> call() throws Exception {
-        if (!skipWatchingNonExistNode) {
+        if (!skipWatchingNonExistNode && !_usePersistWatcher) {
           exists(path, true);
         }
         try {
-          return getChildren(path, true);
+          if (_usePersistWatcher) {
+            if (!skipWatchingNonExistNode || exists(path)) {
+              getConnection().addWatch(path, ZkClient.this, AddWatchMode.PERSISTENT);
+            }
+            return getChildren(path, false);
+          } else {
+            return getChildren(path, true);
+          }
         } catch (ZkNoNodeException e) {
           // ignore, the "exists" watch will listen for the parent node to appear
           LOG.info("zkclient{} watchForChilds path not existing:{} skipWatchingNodeNoteExist: {}",
@@ -2598,6 +2680,7 @@ public class ZkClient implements Watcher {
    * @throws ZkInterruptedException
    */
   public void close() throws ZkInterruptedException {
+    System.out.println("zkCLient closed");
     if (LOG.isTraceEnabled()) {
       StackTraceElement[] calls = Thread.currentThread().getStackTrace();
       LOG.trace("Closing a zkclient uid:{}, callStack: {} ", _uid, Arrays.asList(calls));
@@ -2906,4 +2989,163 @@ public class ZkClient implements Watcher {
           + " is greater than ZkClient size limit " + WRITE_SIZE_LIMIT);
     }
   }
+
+  private void addDataListener(String path, IZkDataListener listener) {
+    //System.out.println("addDataListener: " + path + " client " + this + " listener " + listener);
+    Set<IZkDataListenerEntry> listenerEntries;
+    listenerEntries = _dataListener.get(path);
+    if (listenerEntries == null) {
+      listenerEntries = new CopyOnWriteArraySet<>();
+      _dataListener.put(path, listenerEntries);
+    }
+
+    boolean prefetchEnabled = isPrefetchEnabled(listener);
+    IZkDataListenerEntry listenerEntry = new IZkDataListenerEntry(listener, prefetchEnabled);
+    listenerEntries.add(listenerEntry);
+    if (prefetchEnabled) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("zkclient {} subscribed data changes for {}, listener {}, prefetch data {}", _uid,
+            path, listener, prefetchEnabled);
+      }
+    }
+  }
+
+  private void removeDataListener(String path, IZkDataListener dataListener) {
+    final Set<IZkDataListenerEntry> listeners = _dataListener.get(path);
+    //System.out.println("removeDataListener: " + path);
+    if (listeners != null) {
+      IZkDataListenerEntry listenerEntry = new IZkDataListenerEntry(dataListener);
+      listeners.remove(listenerEntry);
+    }
+    if (listeners == null || listeners.isEmpty()) {
+      _dataListener.remove(path);
+    }
+  }
+
+  private void addChildListener(String path, IZkChildListener listener) {
+    Set<IZkChildListener> listeners = _childListener.get(path);
+    if (listeners == null) {
+      listeners = new CopyOnWriteArraySet<>();
+      _childListener.put(path, listeners);
+    }
+    listeners.add(listener);
+  }
+
+  private void addPersistListener(String path, IZkChildListener childlistener,
+      IZkDataListener dataListener, boolean isDataListener)  {
+    _persistListenerMutex.lock();
+    try {
+      System.out.println("adding listsner: " + path + "isData?" + isDataListener + " this " + this);
+      if (!isDataListener) {
+        addChildListener(path, childlistener);
+      } else if (isDataListener) {
+        addDataListener(path, dataListener);
+      }
+    } finally {
+      _persistListenerMutex.unlock();
+      System.out.println("release lock in addPersistListener");
+    }
+  }
+
+  private void removeChildListener(String path, IZkChildListener listener) {
+    final Set<IZkChildListener> listeners = _childListener.get(path);
+    if (listeners != null) {
+      listeners.remove(listener);
+    }
+
+   /* if ((listeners == null || listeners.isEmpty())) {
+      _childListener.remove(path);
+    }*/
+  }
+
+  private void removePersistListener(String path, IZkChildListener childlistener,
+      IZkDataListener dataListener, boolean isDataListener) {
+    _persistListenerMutex.lock();
+    System.out.println("Request to remove listener on Path: " + path);
+    try {
+      if (!isDataListener) {
+        removeChildListener(path, childlistener);
+      } else if (isDataListener) {
+        removeDataListener(path, dataListener);
+      }
+      if (!hasListeners(path)) {
+        // TODO: update hasListeners logic when recursive persist listener is added
+        //System.out.println("remove persist watcher for path " + path);
+        getConnection().removeWatches(path, this, WatcherType.Any);
+      }
+    } catch (KeeperException | InterruptedException ex) {
+      throw new ZkException(ex);
+    } finally {
+      System.out.println("release lock in removePersistListener");
+      _persistListenerMutex.unlock();
+    }
+  }
+
+
+  static java.lang.reflect.Field getField(Class clazz, String fieldName)
+      throws NoSuchFieldException {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      Class superClass = clazz.getSuperclass();
+      if (superClass == null) {
+        throw e;
+      } else {
+        return getField(superClass, fieldName);
+      }
+    }
+  }
+
+  public static Map<String, List<String>> getZkWatch(ZkClient client)
+      throws Exception {
+    Map<String, List<String>> lists = new HashMap<String, List<String>>();
+    ZkClient zkClient = client;
+
+    ZkConnection connection = ((ZkConnection) zkClient.getConnection());
+    ZooKeeper zk = connection.getZookeeper();
+
+    java.lang.reflect.Field field = getField(zk.getClass(), "watchManager");
+    field.setAccessible(true);
+    Object watchManager = field.get(zk);
+
+    java.lang.reflect.Field field2 = getField(watchManager.getClass(), "dataWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> dataWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "existWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> existWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "childWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> childWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+    field2 = getField(watchManager.getClass(), "persistentWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> persistentWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+    for(String key : persistentWatches.keySet()) {
+      System.out.println("key :" + key);
+      System.out.println("watchers: " + persistentWatches.get(key));
+    }
+
+
+    field2 = getField(watchManager.getClass(), "persistentRecursiveWatches");
+    field2.setAccessible(true);
+    HashMap<String, Set<Watcher>> persistentRecursiveWatches =
+        (HashMap<String, Set<Watcher>>) field2.get(watchManager);
+
+
+    lists.put("dataWatches", new ArrayList<>(dataWatches.keySet()));
+    lists.put("existWatches", new ArrayList<>(existWatches.keySet()));
+    lists.put("childWatches", new ArrayList<>(childWatches.keySet()));
+    lists.put("persistentWatches", new ArrayList<>(persistentWatches.keySet()));
+    lists.put("persistentRecursiveWatches", new ArrayList<>(persistentRecursiveWatches.keySet()));
+
+    return lists;
+  }
+
 }
