@@ -549,6 +549,7 @@ public class TestRawZkClient extends ZkTestBase {
     });
     lock.lock();
 
+
     _zkClient.writeData(TEST_PATH, "Test");
     Assert.assertTrue(callbackFinish.await(10, TimeUnit.SECONDS));
     verifyResult = TestHelper.verify(() -> { return
