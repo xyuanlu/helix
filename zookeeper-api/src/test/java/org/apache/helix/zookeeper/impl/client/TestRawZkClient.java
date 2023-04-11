@@ -547,7 +547,6 @@ public class TestRawZkClient extends ZkTestBase {
           lock.unlock();
         }
       }
-
     });
     lock.lock();
 
