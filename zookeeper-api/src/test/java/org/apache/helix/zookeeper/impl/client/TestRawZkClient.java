@@ -1148,6 +1148,7 @@ public class TestRawZkClient extends ZkTestBase {
     System.setProperty(ZkSystemPropertyKeys.ZK_SERIALIZER_ZNRECORD_WRITE_SIZE_LIMIT_BYTES,
         String.valueOf(ZNRecord.SIZE_LIMIT + 1024));
 
+
     ZkClient zkClient = null;
     try {
       // Constructing ZkClient should throw exception because of invalid write size limit config
