@@ -61,6 +61,7 @@ import org.apache.helix.zookeeper.zkclient.serialize.BasicZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.PathBasedZkSerializer;
 import org.apache.helix.zookeeper.zkclient.serialize.ZkSerializer;
 import org.apache.helix.zookeeper.zkclient.util.ExponentialBackoffStrategy;
+import org.apache.helix.zookeeper.zkclient.util.ZkPathRecursiveWatcherTrie;
 import org.apache.zookeeper.AddWatchMode;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -147,6 +148,8 @@ public class ZkClient implements Watcher {
   // To automatically retry the async operation, we need a separate thread other than the
   // ZkEventThread. Otherwise the retry request might block the normal event processing.
   protected final ZkAsyncRetryThread _asyncCallRetryThread;
+
+  private ZkPathRecursiveWatcherTrie _zkPathRecursiveWatcherTrie;
 
   private class IZkDataListenerEntry {
     final IZkDataListener _dataListener;
@@ -257,6 +260,7 @@ public class ZkClient implements Watcher {
     }
     _usePersistWatcher = usePersistWatcher;
     _persistListenerMutex = new ReentrantLock();
+    _zkPathRecursiveWatcherTrie = new ZkPathRecursiveWatcherTrie();
   }
 
   protected ZkClient(IZkConnection zkConnection, int connectionTimeout, long operationRetryTimeout,
@@ -332,6 +336,10 @@ public class ZkClient implements Watcher {
     */
   public void subscribeDataChanges(String path, IZkDataListener listener) {
     subscribeDataChanges(path, listener, false);
+  }
+
+  public boolean subscribeRecursiveChildChange(String path, RecursivePersistListener listener) {
+    return true;
   }
 
   private boolean isPrefetchEnabled(IZkDataListener dataListener) {
