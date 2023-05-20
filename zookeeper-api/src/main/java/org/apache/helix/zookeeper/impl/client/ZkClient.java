@@ -87,13 +87,23 @@ public class ZkClient extends org.apache.helix.zookeeper.zkclient.ZkClient imple
    *            The JMX bean name will be: HelixZkClient.monitorType.monitorKey.monitorInstanceName.
    * @param monitorRootPathOnly
    *            Should only stat of access to root path be reported to JMX bean or path-specific stat be reported too.
+   * @param connectOnInit true if connect to ZK during initialization, otherwise user will need to call connect
+   *                      explicitly before talking to ZK.
    */
+  public ZkClient(IZkConnection zkConnection, int connectionTimeout, long operationRetryTimeout,
+      PathBasedZkSerializer zkSerializer, String monitorType, String monitorKey,
+      String monitorInstanceName, boolean monitorRootPathOnly, boolean connectOnInit,
+      boolean usePersistWatcher) {
+    super(zkConnection, connectionTimeout, operationRetryTimeout, zkSerializer, monitorType,
+        monitorKey, monitorInstanceName, monitorRootPathOnly, connectOnInit, usePersistWatcher);
+  }
+
   public ZkClient(IZkConnection zkConnection, int connectionTimeout, long operationRetryTimeout,
       PathBasedZkSerializer zkSerializer,
       String monitorType, String monitorKey, String monitorInstanceName,
       boolean monitorRootPathOnly) {
-    super(zkConnection, connectionTimeout, operationRetryTimeout, zkSerializer, monitorType,
-        monitorKey, monitorInstanceName, monitorRootPathOnly);
+    this(zkConnection, connectionTimeout, operationRetryTimeout, zkSerializer, monitorType,
+        monitorKey, monitorInstanceName, monitorRootPathOnly, true, false);
   }
 
   public ZkClient(IZkConnection connection, int connectionTimeout,
@@ -189,6 +199,17 @@ public class ZkClient extends org.apache.helix.zookeeper.zkclient.ZkClient imple
     String _monitorKey;
     String _monitorInstanceName = null;
     boolean _monitorRootPathOnly = true;
+    boolean _connectOnInit = true;
+    boolean _usePersistWatcher = false;
+
+    /**
+     * If set true, the client will connect to ZK during initialization.
+     * Otherwise, user has to call connect() method explicitly before talking to ZK.
+     */
+    public Builder setConnectOnInit(boolean connectOnInit) {
+      _connectOnInit = connectOnInit;
+      return this;
+    }
 
     public Builder setConnection(IZkConnection connection) {
       this._connection = connection;
@@ -258,6 +279,11 @@ public class ZkClient extends org.apache.helix.zookeeper.zkclient.ZkClient imple
       return this;
     }
 
+    public Builder setUsePersistWatcher(boolean usePersistWatcher) {
+      this._usePersistWatcher = usePersistWatcher;
+      return this;
+    }
+
     public ZkClient build() {
       if (_connection == null) {
         if (_zkServer == null) {
@@ -273,7 +299,8 @@ public class ZkClient extends org.apache.helix.zookeeper.zkclient.ZkClient imple
       }
 
       return new ZkClient(_connection, _connectionTimeout, _operationRetryTimeout, _zkSerializer,
-          _monitorType, _monitorKey, _monitorInstanceName, _monitorRootPathOnly);
+          _monitorType, _monitorKey, _monitorInstanceName, _monitorRootPathOnly, _connectOnInit,
+          _usePersistWatcher);
     }
   }
 }
