@@ -262,6 +262,15 @@ public class ZkMetaClientUtil {
     }
   }
 
+  public statis Stat
+
+  convertZkStatToStat(org.apache.zookeeper.data.Stat zkStat) {
+    // TODO:
+    return new Stat(convertZkEntryModeToMetaClientEntryMode(mode), zkStat.getVersion(),
+        zkStat.getCtime(), zkStat.getMtime(),
+        EphemeralType.TTL.getValue(zkStat.getEphemeralOwner()));
+  }
+
   /**
    * This function translate and group Zk exception code to metaclient code.
    * It currently includes all ZK code on 3.6.3.

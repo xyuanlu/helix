@@ -178,6 +178,14 @@ public class ZkMetaClient<T> implements MetaClientInterface<T>, AutoCloseable {
     return _zkClient.readData(key, true);
   }
 
+
+  @Override
+  public T getDataAndStat(final String key, Stat stat) {
+    org.apache.zookeeper.data.Stat zkStat = new org.apache.zookeeper.data.Stat();
+    T data = _zkClient.readData(key, zkStat);
+    stat = new stat()
+  }
+
   @Override
   public List<String> getDirectChildrenKeys(String key) {
     try {

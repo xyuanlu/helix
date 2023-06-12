@@ -202,6 +202,14 @@ public interface MetaClientInterface<T> {
   T get(final String key);
 
   /**
+   * Fetch the data for a given key.
+   * TODO: define exception type when key does not exist
+   * @param key key to identify the entry
+   * @return Return data of the entry
+   */
+  T getDataAndStat(final String key, Stat stat);
+
+  /**
    * API for transaction. The list of operation will be executed as an atomic operation.
    * @param ops a list of operations. These operations will all be executed or none of them.
    * @return Return a list of OpResult.
