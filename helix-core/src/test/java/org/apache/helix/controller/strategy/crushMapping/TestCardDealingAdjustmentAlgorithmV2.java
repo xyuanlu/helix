@@ -189,7 +189,8 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
     };
   }
 
-  @Test(description = "Compute mapping multiple times, the mapping of each time should be same", dataProvider = "stableComputingVerification")
+  @Test(description = "Compute mapping multiple times, the mapping of each time should be same", dataProvider = "stableComputingVerification",
+      dependsOnMethods = "testAlgorithmConstructor")
   public void testStableComputeMappingForMultipleTimes(int replica, int repeatTimes, int seed,
       boolean isEvennessPreferred) {
     System.out.println("START TestCardDealingAdjustmentAlgorithmV2.testStableComputeMappingForMultipleTimes");
@@ -249,7 +250,7 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
     };
   }
 
-  @Test(description = "Test performance given different replica count", dataProvider = "replicas")
+  @Test(description = "Test performance given different replica count", dataProvider = "replicas",  dependsOnMethods = "testStableComputeMappingForMultipleTimes")
   public void testComputeMappingForDifferentReplicas(int replica) {
     System.out.println("SATRT TestCardDealingAdjustmentAlgorithmV2.testComputeMappingForDifferentReplicas");
     CardDealingAdjustmentAlgorithmV2Accessor algorithm =
@@ -282,7 +283,7 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
 
   }
 
-  @Test(description = "Test performance given different preference (evenness or less movements)")
+  @Test(description = "Test performance given different preference (evenness or less movements)", dependsOnMethods = "testComputeMappingForDifferentReplicas")
   public void testComputeMappingForDifferentPreference() {
     System.out.println("START TestCardDealingAdjustmentAlgorithmV2.testComputeMappingForDifferentPreference");
     CardDealingAdjustmentAlgorithmV2Accessor algorithm1 =
@@ -318,7 +319,7 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
     System.out.println("START TestCardDealingAdjustmentAlgorithmV2.testComputeMappingForDifferentPreference");
   }
 
-  @Test
+  @Test (dependsOnMethods = "testComputeMappingForDifferentPreference")
   public void testComputeMappingWhenZeroWeightInstance() {
     System.out.println("START TestCardDealingAdjustmentAlgorithmV2.testComputeMappingWhenZeroWeightInstance");
     when(_topology.getFaultZones()).thenReturn(createFaultZones(new int[][] {
@@ -353,7 +354,7 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
     System.out.println("END TestCardDealingAdjustmentAlgorithmV2.testComputeMappingWhenZeroWeightInstance");
   }
 
-  @Test
+  @Test (dependsOnMethods = "testComputeMappingWhenZeroWeightInstance")
   public void testComputeMappingWhenZeroWeightZone() {
     System.out.println("START TestCardDealingAdjustmentAlgorithmV2.testComputeMappingWhenZeroWeightZone");
     when(_topology.getFaultZones()).thenReturn(createFaultZones(new int[][] {
