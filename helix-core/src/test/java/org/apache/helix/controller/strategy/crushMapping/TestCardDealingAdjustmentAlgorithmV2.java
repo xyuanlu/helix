@@ -333,7 +333,6 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
         } // zone2: instance id = 4, weight = 4; instance id = 5, weight = 5; zone weight = 9
     }));
 
-
     CardDealingAdjustmentAlgorithmV2Accessor algorithm =
         new CardDealingAdjustmentAlgorithmV2Accessor(_topology, DEFAULT_REPLICA_COUNT,
             CardDealingAdjustmentAlgorithmV2.Mode.EVENNESS);
