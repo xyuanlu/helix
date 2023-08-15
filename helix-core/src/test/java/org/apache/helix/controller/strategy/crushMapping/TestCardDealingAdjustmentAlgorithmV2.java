@@ -68,7 +68,6 @@ public class TestCardDealingAdjustmentAlgorithmV2 {
     when(_topology.getFaultZones()).thenReturn(createFaultZones(DEFAULT_ZONES));
   }
 
-
   private List<Node> createFaultZones(int[][] instancesMap) {
     List<Node> faultZones = new ArrayList<>();
     int zoneId = 0;
