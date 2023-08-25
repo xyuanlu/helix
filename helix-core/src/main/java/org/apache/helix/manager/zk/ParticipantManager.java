@@ -132,6 +132,7 @@ public class ParticipantManager {
    * @throws Exception
    */
   public void handleNewSession() throws Exception {
+    System.out.println("handle new session for instance " + _instanceName);
     // Check zk session of this participant is still valid.
     // If not, skip handling new session for this participant.
     final String zkClientHexSession = ZKUtil.toHexSessionId(_zkclient.getSessionId());

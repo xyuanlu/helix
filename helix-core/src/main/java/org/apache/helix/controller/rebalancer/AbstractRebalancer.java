@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.helix.HelixDefinedState;
@@ -55,12 +56,13 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This is a abstract rebalancer that defines some default behaviors for Helix rebalancer
  * as well as all utility functions that will be used by all specific rebalancers.
  */
-public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> implements Rebalancer<T>,
-    MappingCalculator<T> {
+public abstract class AbstractRebalancer<T extends BaseControllerDataProvider>
+    implements Rebalancer<T>, MappingCalculator<T> {
   // These should be final, but are initialized in init rather than a constructor
   protected HelixManager _manager;
   protected RebalanceStrategy<T> _rebalanceStrategy;
@@ -90,8 +92,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * @return
    */
   @Override
-  public ResourceAssignment computeBestPossiblePartitionState(T cache, IdealState idealState,
-      Resource resource, CurrentStateOutput currentStateOutput) {
+  public ResourceAssignment computeBestPossiblePartitionState(T cache, IdealState idealState, Resource resource,
+      CurrentStateOutput currentStateOutput) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing resource:" + resource.getResourceName());
     }
@@ -101,12 +103,11 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     for (Partition partition : resource.getPartitions()) {
       Set<String> disabledInstancesForPartition =
           cache.getDisabledInstancesForPartition(resource.getResourceName(), partition.toString());
-      List<String> preferenceList = getPreferenceList(partition, idealState,
-          Collections.unmodifiableSet(cache.getLiveInstances().keySet()));
+      List<String> preferenceList =
+          getPreferenceList(partition, idealState, Collections.unmodifiableSet(cache.getLiveInstances().keySet()));
       Map<String, String> bestStateForPartition =
-          computeBestPossibleStateForPartition(cache.getLiveInstances().keySet(), stateModelDef,
-              preferenceList, currentStateOutput, disabledInstancesForPartition, idealState,
-              cache.getClusterConfig(), partition,
+          computeBestPossibleStateForPartition(cache.getLiveInstances().keySet(), stateModelDef, preferenceList,
+              currentStateOutput, disabledInstancesForPartition, idealState, cache.getClusterConfig(), partition,
               cache.getAbnormalStateResolver(stateModelDefName), cache);
       partitionMapping.addReplicaMap(partition, bestStateForPartition);
     }
@@ -129,14 +130,13 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     return null;
   }
 
-  protected Map<String, Map<String, String>> currentMapping(CurrentStateOutput currentStateOutput,
-      String resourceName, List<String> partitions, Map<String, Integer> stateCountMap) {
+  protected Map<String, Map<String, String>> currentMapping(CurrentStateOutput currentStateOutput, String resourceName,
+      List<String> partitions, Map<String, Integer> stateCountMap) {
 
     Map<String, Map<String, String>> map = new HashMap<>();
 
     for (String partition : partitions) {
-      Map<String, String> curStateMap =
-          currentStateOutput.getCurrentStateMap(resourceName, new Partition(partition));
+      Map<String, String> curStateMap = currentStateOutput.getCurrentStateMap(resourceName, new Partition(partition));
       map.put(partition, new HashMap<String, String>());
       for (String node : curStateMap.keySet()) {
         String state = curStateMap.get(node);
@@ -153,28 +153,25 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     return map;
   }
 
-  protected RebalanceStrategy<T> getRebalanceStrategy(String rebalanceStrategyName, List<String> partitions, String resourceName,
-      LinkedHashMap<String, Integer> stateCountMap, int maxPartition) {
+  protected RebalanceStrategy<T> getRebalanceStrategy(String rebalanceStrategyName, List<String> partitions,
+      String resourceName, LinkedHashMap<String, Integer> stateCountMap, int maxPartition) {
     RebalanceStrategy rebalanceStrategy;
-    if (rebalanceStrategyName == null || rebalanceStrategyName.equalsIgnoreCase(RebalanceStrategy.DEFAULT_REBALANCE_STRATEGY)) {
-      rebalanceStrategy =
-          new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition);
+    if (rebalanceStrategyName == null || rebalanceStrategyName.equalsIgnoreCase(
+        RebalanceStrategy.DEFAULT_REBALANCE_STRATEGY)) {
+      rebalanceStrategy = new AutoRebalanceStrategy(resourceName, partitions, stateCountMap, maxPartition);
     } else {
       try {
-        rebalanceStrategy = RebalanceStrategy.class.cast(
-            HelixUtil.loadClass(getClass(), rebalanceStrategyName).newInstance());
+        rebalanceStrategy =
+            RebalanceStrategy.class.cast(HelixUtil.loadClass(getClass(), rebalanceStrategyName).newInstance());
         rebalanceStrategy.init(resourceName, partitions, stateCountMap, maxPartition);
       } catch (ClassNotFoundException ex) {
-        throw new HelixException(
-            "Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
+        throw new HelixException("Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
             ex);
       } catch (InstantiationException ex) {
-        throw new HelixException(
-            "Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
+        throw new HelixException("Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
             ex);
       } catch (IllegalAccessException ex) {
-        throw new HelixException(
-            "Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
+        throw new HelixException("Exception while invoking custom rebalance strategy class: " + rebalanceStrategyName,
             ex);
       }
     }
@@ -196,13 +193,11 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * @return
    */
   protected Map<String, String> computeBestPossibleStateForPartition(Set<String> liveInstances,
-      StateModelDefinition stateModelDef, List<String> preferenceList,
-      CurrentStateOutput currentStateOutput, Set<String> disabledInstancesForPartition,
-      IdealState idealState, ClusterConfig clusterConfig, Partition partition,
-      MonitoredAbnormalResolver monitoredResolver) {
-    return computeBestPossibleStateForPartition(liveInstances, stateModelDef, preferenceList,
-        currentStateOutput, disabledInstancesForPartition, idealState, clusterConfig, partition,
-        monitoredResolver, null);
+      StateModelDefinition stateModelDef, List<String> preferenceList, CurrentStateOutput currentStateOutput,
+      Set<String> disabledInstancesForPartition, IdealState idealState, ClusterConfig clusterConfig,
+      Partition partition, MonitoredAbnormalResolver monitoredResolver) {
+    return computeBestPossibleStateForPartition(liveInstances, stateModelDef, preferenceList, currentStateOutput,
+        disabledInstancesForPartition, idealState, clusterConfig, partition, monitoredResolver, null);
   }
 
   /**
@@ -220,21 +215,20 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * @return
    */
   protected Map<String, String> computeBestPossibleStateForPartition(Set<String> liveInstances,
-      StateModelDefinition stateModelDef, List<String> preferenceList,
-      CurrentStateOutput currentStateOutput, Set<String> disabledInstancesForPartition,
-      IdealState idealState, ClusterConfig clusterConfig, Partition partition,
-      MonitoredAbnormalResolver monitoredResolver, T cache) {
+      StateModelDefinition stateModelDef, List<String> preferenceList, CurrentStateOutput currentStateOutput,
+      Set<String> disabledInstancesForPartition, IdealState idealState, ClusterConfig clusterConfig,
+      Partition partition, MonitoredAbnormalResolver monitoredResolver, T cache) {
 
     Optional<Map<String, String>> optionalOverwrittenStates =
-        computeStatesOverwriteForPartition(stateModelDef, preferenceList, currentStateOutput,
-            idealState, partition, monitoredResolver);
+        computeStatesOverwriteForPartition(stateModelDef, preferenceList, currentStateOutput, idealState, partition,
+            monitoredResolver);
 
     if (optionalOverwrittenStates.isPresent()) {
       return optionalOverwrittenStates.get();
     }
 
-    Map<String, String> currentStateMap = new HashMap<>(
-        currentStateOutput.getCurrentStateMap(idealState.getResourceName(), partition));
+    Map<String, String> currentStateMap =
+        new HashMap<>(currentStateOutput.getCurrentStateMap(idealState.getResourceName(), partition));
     return computeBestPossibleMap(preferenceList, stateModelDef, currentStateMap, liveInstances,
         disabledInstancesForPartition);
   }
@@ -251,13 +245,11 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * @return An optional object which contains the assignment map if overwritten is necessary.
    * Otherwise return Optional.empty().
    */
-  protected Optional<Map<String, String>> computeStatesOverwriteForPartition(
-      final StateModelDefinition stateModelDef, final List<String> preferenceList,
-      final CurrentStateOutput currentStateOutput, IdealState idealState, final Partition partition,
-      final MonitoredAbnormalResolver monitoredResolver) {
+  protected Optional<Map<String, String>> computeStatesOverwriteForPartition(final StateModelDefinition stateModelDef,
+      final List<String> preferenceList, final CurrentStateOutput currentStateOutput, IdealState idealState,
+      final Partition partition, final MonitoredAbnormalResolver monitoredResolver) {
     String resourceName = idealState.getResourceName();
-    Map<String, String> currentStateMap =
-        currentStateOutput.getCurrentStateMap(resourceName, partition);
+    Map<String, String> currentStateMap = currentStateOutput.getCurrentStateMap(resourceName, partition);
 
     // (1) If the partition is removed from IS or the IS is deleted.
     // Transit to DROPPED no matter the instance is disabled or not.
@@ -271,17 +263,15 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     }
 
     // (3) If the current states are not valid, fix the invalid part first.
-    if (!monitoredResolver
-        .checkCurrentStates(currentStateOutput, resourceName, partition, stateModelDef)) {
+    if (!monitoredResolver.checkCurrentStates(currentStateOutput, resourceName, partition, stateModelDef)) {
       monitoredResolver.recordAbnormalState();
-      Map<String, String> recoveryAssignment = monitoredResolver
-          .computeRecoveryAssignment(currentStateOutput, resourceName, partition, stateModelDef,
+      Map<String, String> recoveryAssignment =
+          monitoredResolver.computeRecoveryAssignment(currentStateOutput, resourceName, partition, stateModelDef,
               preferenceList);
-      if (recoveryAssignment == null || !recoveryAssignment.keySet()
-          .equals(currentStateMap.keySet())) {
-        throw new HelixException(String.format(
-            "Invalid recovery assignment %s since it changed the current partition placement %s",
-            recoveryAssignment, currentStateMap));
+      if (recoveryAssignment == null || !recoveryAssignment.keySet().equals(currentStateMap.keySet())) {
+        throw new HelixException(
+            String.format("Invalid recovery assignment %s since it changed the current partition placement %s",
+                recoveryAssignment, currentStateMap));
       }
       monitoredResolver.recordRecoveryAttempt();
       return Optional.of(recoveryAssignment);
@@ -290,8 +280,7 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     return Optional.empty();
   }
 
-  protected Map<String, String> computeBestPossibleMapForDroppedResource(
-      final Map<String, String> currentStateMap) {
+  protected Map<String, String> computeBestPossibleMapForDroppedResource(final Map<String, String> currentStateMap) {
     Map<String, String> bestPossibleStateMap = new HashMap<>();
     for (String instance : currentStateMap.keySet()) {
       bestPossibleStateMap.put(instance, HelixDefinedState.DROPPED.toString());
@@ -299,8 +288,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     return bestPossibleStateMap;
   }
 
-  protected Map<String, String> computeBestPossibleMapForDisabledResource(
-      final Map<String, String> currentStateMap, StateModelDefinition stateModelDef) {
+  protected Map<String, String> computeBestPossibleMapForDisabledResource(final Map<String, String> currentStateMap,
+      StateModelDefinition stateModelDef) {
     Map<String, String> bestPossibleStateMap = new HashMap<>();
     for (String instance : currentStateMap.keySet()) {
       if (!HelixDefinedState.ERROR.name().equals(currentStateMap.get(instance))) {
@@ -314,8 +303,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
       Set<String> eligibleInstances) {
     List<String> listField = idealState.getPreferenceList(partition.getPartitionName());
 
-    if (listField != null && listField.size() == 1
-        && IdealState.IdealStateConstants.ANY_LIVEINSTANCE.toString().equals(listField.get(0))) {
+    if (listField != null && listField.size() == 1 && IdealState.IdealStateConstants.ANY_LIVEINSTANCE.toString()
+        .equals(listField.get(0))) {
       List<String> prefList = new ArrayList<String>(eligibleInstances);
       Collections.sort(prefList);
       return prefList;
@@ -356,8 +345,19 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
 
     // (1) Instances that have current state but not in preference list, drop, no matter it's disabled or not.
     for (String instance : currentStateMap.keySet()) {
+      //System.out.println("computeBestPossibleMap ");
       if (!preferenceList.contains(instance)) {
-        bestPossibleStateMap.put(instance, HelixDefinedState.DROPPED.name());
+        System.out.println("preferenceList not containing instance " + instance);
+        // we drop instance only when the 4th replica is not active yet, and the old instance was offline
+        // for a short period of time.
+        /*AtomicInteger numOfOfflinePartition = new AtomicInteger();
+        currentStateMap.entrySet()
+            .stream()
+            .filter(e -> preferenceList.contains(e.getKey()) && e.getValue().equals("OFFLINE"))
+            .map(e -> numOfOfflinePartition.getAndIncrement());
+        if (numOfOfflinePartition.get() >=3) {*/
+          bestPossibleStateMap.put(instance, HelixDefinedState.DROPPED.name());
+        //}
       }
     }
 
@@ -393,16 +393,15 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * To achieve that, we sort the preferenceList based on CurrentState, by treating top-state and
    * second-states with same priority and rely on the fact that Collections.sort() is stable.
    */
-  private void assignStatesToInstances(final List<String> preferenceList,
-      final StateModelDefinition stateModelDef, final Map<String, String> currentStateMap,
-      final Set<String> liveInstances, final Set<String> disabledInstancesForPartition,
-      Map<String, String> bestPossibleStateMap) {
+  private void assignStatesToInstances(final List<String> preferenceList, final StateModelDefinition stateModelDef,
+      final Map<String, String> currentStateMap, final Set<String> liveInstances,
+      final Set<String> disabledInstancesForPartition, Map<String, String> bestPossibleStateMap) {
     // Record the assigned instances to avoid double calculating or conflict assignment.
     Set<String> assignedInstances = new HashSet<>();
 
-    Set<String> liveAndEnabled =
-        liveInstances.stream().filter(instance -> !disabledInstancesForPartition.contains(instance))
-            .collect(Collectors.toSet());
+    Set<String> liveAndEnabled = liveInstances.stream()
+        .filter(instance -> !disabledInstancesForPartition.contains(instance))
+        .collect(Collectors.toSet());
 
     Queue<String> preferredActiveInstanceQueue = new LinkedList<>(preferenceList);
     preferredActiveInstanceQueue.retainAll(liveAndEnabled);
@@ -417,8 +416,7 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
 
     // Assign the states to the instances that appear in the preference list.
     for (String state : stateModelDef.getStatesPriorityList()) {
-      int stateCount =
-          getStateCount(state, stateModelDef, liveAndEnabled.size(), preferenceList.size());
+      int stateCount = getStateCount(state, stateModelDef, liveAndEnabled.size(), preferenceList.size());
       while (!preferredActiveInstanceQueue.isEmpty()) {
         if (stateCount <= 0) {
           break; // continue assigning for the next state
@@ -429,9 +427,9 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
           continue; // continue checking for the next available instance
         }
         String proposedInstance = adjustInstanceIfNecessary(state, peekInstance,
-            currentStateMap.getOrDefault(peekInstance, stateModelDef.getInitialState()),
-            stateModelDef, assignedInstances, totalCandidateCount - assignedInstances.size(),
-            stateCount, currentStatePrioritizedInstanceIter);
+            currentStateMap.getOrDefault(peekInstance, stateModelDef.getInitialState()), stateModelDef,
+            assignedInstances, totalCandidateCount - assignedInstances.size(), stateCount,
+            currentStatePrioritizedInstanceIter);
 
         if (proposedInstance.equals(peekInstance)) {
           // If the peeked instance is the final decision, then poll it from the queue.
@@ -450,9 +448,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
         // Note that in either case, the proposed instance is considered to be assigned with a state
         // by now.
         if (!assignedInstances.add(proposedInstance)) {
-          throw new AssertionError(String
-              .format("The proposed instance %s has been already assigned before.",
-                  proposedInstance));
+          throw new AssertionError(
+              String.format("The proposed instance %s has been already assigned before.", proposedInstance));
         }
       }
     }
@@ -478,10 +475,9 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
    * @return The alternative instance, or the original proposed instance if adjustment is not
    * necessary.
    */
-  private String adjustInstanceIfNecessary(String requestedState, String proposedInstance,
-      String currentState, StateModelDefinition stateModelDef, Set<String> assignedInstances,
-      int remainCandidateCount, int remainRequestCount,
-      Iterator<String> currentStatePrioritizedInstanceIter) {
+  private String adjustInstanceIfNecessary(String requestedState, String proposedInstance, String currentState,
+      StateModelDefinition stateModelDef, Set<String> assignedInstances, int remainCandidateCount,
+      int remainRequestCount, Iterator<String> currentStatePrioritizedInstanceIter) {
     String adjustedInstance = proposedInstance;
     // Check and alternate the assignment for reducing top state handoff.
     // 1. If the requested state is not the top state, then it does not worth it to adjust.
@@ -489,9 +485,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     // to adjust.
     // 3. If the proposed instance already has the top state or a secondary state, then adjustment
     // is not necessary.
-    if (remainRequestCount < remainCandidateCount && requestedState
-        .equals(stateModelDef.getTopState()) && !requestedState.equals(currentState)
-        && !stateModelDef.getSecondTopStates().contains(currentState)) {
+    if (remainRequestCount < remainCandidateCount && requestedState.equals(stateModelDef.getTopState())
+        && !requestedState.equals(currentState) && !stateModelDef.getSecondTopStates().contains(currentState)) {
       // If the desired state is the top state, but the instance cannot be transited to the
       // top state in one hop, try to keep the top state on current host or a host with a closer
       // state.
@@ -518,8 +513,7 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     private final Map<String, String> _currentStateMap;
     private final StateModelDefinition _stateModelDef;
 
-    public StatePriorityComparator(Map<String, String> currentStateMap,
-        StateModelDefinition stateModelDef) {
+    public StatePriorityComparator(Map<String, String> currentStateMap, StateModelDefinition stateModelDef) {
       _currentStateMap = currentStateMap;
       _stateModelDef = stateModelDef;
     }
@@ -544,8 +538,8 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
     protected final StateModelDefinition _stateModelDef;
     protected final List<String> _preferenceList;
 
-    public PreferenceListNodeComparator(Map<String, String> currentStateMap,
-        StateModelDefinition stateModelDef, List<String> preferenceList) {
+    public PreferenceListNodeComparator(Map<String, String> currentStateMap, StateModelDefinition stateModelDef,
+        List<String> preferenceList) {
       _currentStateMap = currentStateMap;
       _stateModelDef = stateModelDef;
       _preferenceList = preferenceList;
@@ -587,14 +581,13 @@ public abstract class AbstractRebalancer<T extends BaseControllerDataProvider> i
   // TODO: impacting user's clusters.
   protected List<String> getStablePartitionList(ResourceControllerDataProvider clusterData,
       IdealState currentIdealState) {
-    List<String> partitions =
-        clusterData.getStablePartitionList(currentIdealState.getResourceName());
+    List<String> partitions = clusterData.getStablePartitionList(currentIdealState.getResourceName());
     if (partitions == null) {
       Set<String> currentPartitionSet = currentIdealState.getPartitionSet();
       // In theory, the cached stable partition list must have contains all items in the current
       // partition set. Add one more check to avoid any intermediate change that modifies the list.
       LOG.warn("The current partition set {} has not been cached in the stable partition list. "
-              + "Use the IdealState partition set directly.", currentPartitionSet.toString());
+          + "Use the IdealState partition set directly.", currentPartitionSet.toString());
       partitions = new ArrayList<>(currentPartitionSet);
     }
     return partitions;
