@@ -358,24 +358,26 @@ public class TestInstanceOperation extends ZkTestBase {
     // EV should contain all participants, check resources one by one
     assignment = getEV();
     for (String resource : _allDBs) {
-      ExternalView ev = assignment.get(resource);
-      for (String partition : ev.getPartitionSet()) {
-        AtomicInteger activeReplicaCount = new AtomicInteger();
-        ev.getStateMap(partition)
-            .values()
-            .stream()
-            .filter(
-                v -> v.equals("MASTER") || v.equals("LEADER") || v.equals("SLAVE") || v.equals("FOLLOWER") || v.equals(
-                    "STANDBY"))
-            .forEach(v -> activeReplicaCount.getAndIncrement());
-        TestHelper.verify(() -> (activeReplicaCount.get() >= REPLICA - 1), 30000);
-        Assert.assertFalse(ev.getStateMap(partition).containsKey(evacuateInstanceName) && ev.getStateMap(partition)
-            .get(evacuateInstanceName)
-            .equals("MASTER") && ev.getStateMap(partition)
-            .get(evacuateInstanceName)
-            .equals("LEADER"));
 
-      }
+      TestHelper.verify(() -> {
+        ExternalView ev = assignment.get(resource);
+        for (String partition : ev.getPartitionSet()) {
+          AtomicInteger activeReplicaCount = new AtomicInteger();
+          ev.getStateMap(partition)
+              .values()
+              .stream()
+              .filter(v -> v.equals("MASTER") || v.equals("LEADER") || v.equals("SLAVE") || v.equals("FOLLOWER")
+                  || v.equals("STANDBY"))
+              .forEach(v -> activeReplicaCount.getAndIncrement());
+          if (activeReplicaCount.get() < REPLICA - 1 || (ev.getStateMap(partition).containsKey(evacuateInstanceName)
+              && ev.getStateMap(partition).get(evacuateInstanceName).equals("MASTER") && ev.getStateMap(partition)
+              .get(evacuateInstanceName)
+              .equals("LEADER"))) {
+            return false;
+          }
+        }
+        return true;
+      }, 30000);
     }
 
     _participants.get(1).syncStart();
