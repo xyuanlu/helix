@@ -385,6 +385,7 @@ public class TestInstanceOperation extends ZkTestBase {
   }
 
 
+
   private void addParticipant(String participantName) {
     _gSetupTool.addInstanceToCluster(CLUSTER_NAME, participantName);
 
