@@ -389,6 +389,7 @@ public class WagedRebalancer implements StatefulRebalancer<ResourceControllerDat
    * @param algorithm The rebalance algorithm
    * @return The resource assignment with delayed rebalance minActiveReplica
    */
+
   private Map<String, ResourceAssignment> handleDelayedRebalanceMinActiveReplica(
       ResourceControllerDataProvider clusterData,
       Map<String, Resource> resourceMap,
