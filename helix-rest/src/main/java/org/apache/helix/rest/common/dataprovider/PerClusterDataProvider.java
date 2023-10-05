@@ -1,9 +1,11 @@
 package org.apache.helix.rest.common.dataprovider;
 
 import java.util.Map;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.common.caches.PropertyCache;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ClusterConstraints;
 import org.apache.helix.model.CurrentState;
@@ -13,7 +15,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
-
+import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 
 // TODO: add init to this and property caches
 // Add key function and root key
@@ -21,8 +23,11 @@ import org.apache.helix.model.StateModelDefinition;
 
 public class PerClusterDataProvider {
 
-  private final String _clusterName;
+  private HelixDataAccessor _accessor;
 
+  private RealmAwareZkClient _zkclient;
+
+  private final String _clusterName;
   private final RestPropertyCache<InstanceConfig> _instanceConfigCache;
   private final RestPropertyCache<ClusterConfig> _clusterConfigCache;
   private final RestPropertyCache<ResourceConfig> _resourceConfigCache;
@@ -33,8 +38,11 @@ public class PerClusterDataProvider {
   // special cache
   private final RestCurrentStateCache _currentStateCache;
 
-  public PerClusterDataProvider(String clusterName) {
-    _clusterName = clusterName;
+  public PerClusterDataProvider(String clusterName, RealmAwareZkClient zkClient, BaseDataAccessor baseDataAccessor) {
+    _clusterName =  clusterName;
+    _accessor = new ZKHelixDataAccessor(clusterName, baseDataAccessor);
+
+    _zkclient = zkClient;
     _clusterConfigCache = new RestPropertyCache<>("clusterConfig", new RestPropertyCache.PropertyCacheKeyFuncs<ClusterConfig>() {
       @Override
       public PropertyKey getRootKey(HelixDataAccessor accessor) {
@@ -168,6 +176,9 @@ public class PerClusterDataProvider {
     return _instanceConfigCache.getPropertyMap();
   }
 
+  public Map<String, ResourceConfig> getResourceConfigMap() {
+    return _resourceConfigCache.getPropertyMap();
+  }
   public StateModelDefinition getStateModelDef(String stateModelDefRef) {
     return _stateModelDefinitionCache.getPropertyMap().get(stateModelDefRef);
   }
@@ -175,5 +186,16 @@ public class PerClusterDataProvider {
   // TODO: consolidate EV from CSs
   public Map<String, ExternalView> consolidateExternalViews() {
     return null;
+  }
+
+  public void initCache(final HelixDataAccessor accessor) {
+    //_accessor = accessor;
+    _clusterConfigCache.init(accessor);
+    _instanceConfigCache.init(accessor);
+    _resourceConfigCache.init(accessor);
+    _liveInstanceCache.init(accessor);
+    _idealStateCache.init(accessor);
+    _stateModelDefinitionCache.init(accessor);
+    _currentStateCache.init(accessor);
   }
 }
