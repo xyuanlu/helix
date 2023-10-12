@@ -20,16 +20,22 @@ package org.apache.helix.rest.common.dataprovider;
  */
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.common.caches.PropertyCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+/**
+ * Class for caching simple HelixProperty objects.
+ * @param <T>
+ */
 public class RestPropertyCache<T extends HelixProperty> {
+  private static final Logger LOG = LoggerFactory.getLogger(RestPropertyCache.class);
 
   private ConcurrentHashMap<String, T> _objCache;
   private final String _propertyDescription;
@@ -66,6 +72,7 @@ public class RestPropertyCache<T extends HelixProperty> {
 
   public void init(final HelixDataAccessor accessor) {
     _objCache = new ConcurrentHashMap<>(accessor.getChildValuesMap(_keyFuncs.getRootKey(accessor), true));
+    LOG.info("Init RestPropertyCache for {}. ", _propertyDescription);
   }
 
   public Map<String, T> getPropertyMap() {

@@ -36,10 +36,11 @@ import org.apache.helix.model.ResourceConfig;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.zookeeper.api.client.RealmAwareZkClient;
 
-// TODO: add init to this and property caches
-// Add key function and root key
 
-
+/**
+ * Dara cache for each Helix cluster. Configs, ideal stats and current states are read from ZK and updated
+ * using event changes. External view are consolidated using current state.
+ */
 public class PerClusterDataProvider {
 
   private HelixDataAccessor _accessor;
@@ -47,6 +48,8 @@ public class PerClusterDataProvider {
   private RealmAwareZkClient _zkclient;
 
   private final String _clusterName;
+
+  // Simple caches
   private final RestPropertyCache<InstanceConfig> _instanceConfigCache;
   private final RestPropertyCache<ClusterConfig> _clusterConfigCache;
   private final RestPropertyCache<ResourceConfig> _resourceConfigCache;
@@ -54,8 +57,10 @@ public class PerClusterDataProvider {
   private final RestPropertyCache<IdealState> _idealStateCache;
   private final RestPropertyCache<StateModelDefinition> _stateModelDefinitionCache;
 
-  // special cache
+  // special caches
   private final RestCurrentStateCache _currentStateCache;
+
+  // TODO: add external view caches
 
   public PerClusterDataProvider(String clusterName, RealmAwareZkClient zkClient, BaseDataAccessor baseDataAccessor) {
     _clusterName =  clusterName;
@@ -65,7 +70,7 @@ public class PerClusterDataProvider {
     _clusterConfigCache = new RestPropertyCache<>("clusterConfig", new RestPropertyCache.PropertyCacheKeyFuncs<ClusterConfig>() {
       @Override
       public PropertyKey getRootKey(HelixDataAccessor accessor) {
-        return accessor.keyBuilder().clusterConfig();
+        return accessor.keyBuilder().clusterConfigs();
       }
 
       @Override
@@ -203,8 +208,8 @@ public class PerClusterDataProvider {
     return null;
   }
 
+  // Used for dummy cache. Remove later
   public void initCache(final HelixDataAccessor accessor) {
-    //_accessor = accessor;
     _clusterConfigCache.init(accessor);
     _instanceConfigCache.init(accessor);
     _resourceConfigCache.init(accessor);
@@ -215,7 +220,6 @@ public class PerClusterDataProvider {
   }
 
   public void initCache() {
-    //_accessor = accessor;
     _clusterConfigCache.init(_accessor);
     _instanceConfigCache.init(_accessor);
     _resourceConfigCache.init(_accessor);

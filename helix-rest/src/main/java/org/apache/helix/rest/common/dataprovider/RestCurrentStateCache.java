@@ -24,8 +24,13 @@ import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.model.CurrentState;
 
 
+/**
+ * Special cache for instances current states.
+ *
+ */
 public class RestCurrentStateCache {
 
+  //Map<instanceName, Map<ResourceName, CurrentState>>
   private ConcurrentHashMap<String, ConcurrentHashMap<String, CurrentState>>  _objCache;
 
   public RestCurrentStateCache() {

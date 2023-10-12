@@ -75,6 +75,7 @@ public class RestDataProviderCallbackHandler implements RecursivePersistListener
 
   private void subscribeClusterDataChange() {
     // call zkclient subscribe for change
+    // _zkClient.subscribePersistRecursiveListener(_clusterName, this);
   }
 
   private void init() {

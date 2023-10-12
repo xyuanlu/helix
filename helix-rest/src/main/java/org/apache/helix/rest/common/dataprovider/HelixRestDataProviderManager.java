@@ -40,6 +40,7 @@ public class HelixRestDataProviderManager {
   private RestServiceDataProvider _restServiceDataProvider;
   // list of callback handlers
 
+  //TODO: create own zk client
   public HelixRestDataProviderManager(RealmAwareZkClient zkclient, HelixAdmin helixAdmin) {
     _zkclient = zkclient;
     _helixAdmin = helixAdmin;
@@ -58,7 +59,11 @@ public class HelixRestDataProviderManager {
           new PerClusterDataProvider(cluster, _zkclient, new ZkBaseDataAccessor(_zkclient));
       clusterDataProvider.initCache();
       // register callback handler for each provider
+
       _restServiceDataProvider.addClusterDataProvider(cluster, clusterDataProvider);
     }
+  }
+
+  public void close() {
   }
 }
