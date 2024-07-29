@@ -19,6 +19,12 @@ package org.apache.helix.gateway;
  * under the License.
  */
 
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.gateway.grpcservice.HelixGatewayServiceGrpcService;
+
+
 /**
  * Main class for Helix Gateway.
  * It starts the Helix Gateway grpc service.
@@ -29,6 +35,6 @@ public final class HelixGatewayMain {
   }
 
   public static void main(String[] args) throws InterruptedException {
-
   }
 }
+

@@ -26,4 +26,6 @@ public interface HelixGatewayServiceProcessor {
 
   public boolean sendStateTransitionMessage( String instanceName);
 
+  public boolean closeConnection(String instanceName, String reason);
+
 }

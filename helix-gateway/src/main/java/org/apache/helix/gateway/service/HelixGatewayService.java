@@ -54,6 +54,7 @@ public class HelixGatewayService {
    * It creates a HelixParticipantManager and connects to the Helix controller.
    */
   public void registerParticipant() {
+
     // TODO: create participant manager and add to _participantsMap
     HelixManager manager = new ZKHelixManager("clusterName", "instanceName", InstanceType.PARTICIPANT, _zkAddress);
     manager.getStateMachineEngine()

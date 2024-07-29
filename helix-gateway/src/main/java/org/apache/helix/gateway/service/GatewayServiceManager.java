@@ -129,7 +129,7 @@ public class GatewayServiceManager {
   }
 
   @VisibleForTesting
-  HelixGatewayServiceGrpcService getGrpcService() {
+  public HelixGatewayServiceGrpcService getGrpcService() {
     return _grpcService;
   }
 

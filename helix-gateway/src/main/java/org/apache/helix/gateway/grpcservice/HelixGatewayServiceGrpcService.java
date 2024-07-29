@@ -19,6 +19,7 @@ package org.apache.helix.gateway.grpcservice;
  * under the License.
  */
 
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.HashMap;
 import java.util.Map;
@@ -101,6 +102,19 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
     observer = _observerMap.get(instanceName);
     if (observer != null) {
       observer.onNext(StateTransitionMessageTranslateUtil.translateSTMsgToTransitionMessage());
+    }
+    return true;
+  }
+
+  /**
+   * Close the connection of the instance with specified reason
+   */
+  @Override
+  public boolean closeConnection(String instanceName, String reason) {
+    StreamObserver<TransitionMessage> observer;
+    observer = _observerMap.get(instanceName);
+    if (observer != null) {
+      observer.onError(Status.UNAVAILABLE.withDescription(reason).asRuntimeException());
     }
     return true;
   }
