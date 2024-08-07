@@ -44,7 +44,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.controller.rebalancer.strategy.RebalanceStrategy;
-import org.apache.helix.gateway.server.grpcserver.HelixGatewayServiceGrpcService;
+import org.apache.helix.gateway.channel.HelixGatewayServiceGrpcService;
 import org.apache.helix.gateway.service.GatewayServiceManager;
 import org.apache.helix.gateway.server.grpcserver.HelixGatewayGrpcServerBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;

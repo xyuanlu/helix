@@ -21,6 +21,7 @@ package org.apache.helix.gateway;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.gateway.channel.HelixGatewayServiceGrpcService;
 import org.apache.helix.gateway.service.GatewayServiceManager;
 import org.apache.helix.gateway.service.GatewayServiceProcessorConfig;
 

@@ -28,18 +28,7 @@ import org.apache.helix.model.Message;
  * Helix Gateway Service channel interface provides API for inbound and outbound communication between
  * Gateway service and application instances.
  */
-<<<<<<<< HEAD:helix-gateway/src/main/java/org/apache/helix/gateway/api/service/HelixGatewayServiceClientConnectionProcessor.java
-public interface HelixGatewayServiceClientConnectionProcessor {
 
-
-  /**
-   * Callback when we detect client connection is closed. It could be when client gracefully close the connection，
-   * or when client connection is timed out.
-   * @param clusterName  cluster name
-   * @param instanceName  instance name
-   */
-  public void onClientClose(String clusterName, String instanceName);
-========
 public interface HelixGatewayServiceChannel {
 
   /**
@@ -81,5 +70,4 @@ public interface HelixGatewayServiceChannel {
    * @param instanceName  instance name
    */
   public void completeConnection(String instanceName);
->>>>>>>> c8b80ed17 (simplify interface):helix-gateway/src/main/java/org/apache/helix/gateway/api/service/HelixGatewayServiceChannel.java
 }
