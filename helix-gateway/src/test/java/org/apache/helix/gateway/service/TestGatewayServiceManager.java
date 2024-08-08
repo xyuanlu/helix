@@ -1,6 +1,6 @@
 package org.apache.helix.gateway.service;
 
-import org.apache.helix.gateway.grpcservice.HelixGatewayServiceGrpcService;
+import org.apache.helix.gateway.server.grpcserver.HelixGatewayServiceGrpcService;
 import org.testng.annotations.Test;
 import proto.org.apache.helix.gateway.HelixGatewayServiceOuterClass;
 

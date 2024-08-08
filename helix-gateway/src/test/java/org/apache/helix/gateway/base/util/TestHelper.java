@@ -44,9 +44,9 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
 import org.apache.helix.controller.rebalancer.strategy.RebalanceStrategy;
-import org.apache.helix.gateway.grpcservice.HelixGatewayServiceGrpcService;
+import org.apache.helix.gateway.server.grpcserver.HelixGatewayServiceGrpcService;
 import org.apache.helix.gateway.service.GatewayServiceManager;
-import org.apache.helix.gateway.util.HelixGatewayGrpcServerBuilder;
+import org.apache.helix.gateway.server.grpcserver.HelixGatewayGrpcServerBuilder;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
@@ -73,8 +73,6 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-
-import static org.apache.helix.gateway.constant.GatewayServiceGrpcDefaultConfig.*;
 
 
 public class TestHelper {

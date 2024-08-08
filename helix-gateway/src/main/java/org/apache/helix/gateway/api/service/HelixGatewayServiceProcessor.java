@@ -19,12 +19,68 @@ package org.apache.helix.gateway.api.service;
  * under the License.
  */
 
+import java.io.IOException;
+import org.apache.helix.gateway.service.GatewayServiceEvent;
+import org.apache.helix.gateway.service.GatewayServiceManager;
+import org.apache.helix.model.Message;
+
 
 /**
  * Helix Gateway Service Processor interface allows sending state transition messages to
  * participants through service implementing this interface.
  */
-public interface HelixGatewayServiceProcessor
-    extends HelixGatewayServiceClientConnectionMonitor, HelixGatewayServiceShardStateProcessor {
+public interface HelixGatewayServiceProcessor {
+
+  /**
+   * Gateway service send a state transition message to a connected participant.
+   *
+   * @param instanceName the name of the participant
+   * @param currentState the current state of the shard
+   * @param message      the message to send
+   */
+  void sendStateTransitionMessage(String instanceName, String currentState, Message message);
+
+  /**
+   * Callback when receiving a client event.
+   * Event could be a connection closed event (event type DISCONNECT),
+   * an initial connection establish event that contains a map of current chard states (event type CONNECT),
+   * or a state transition result message (event type UPDATE).
+   *
+   * The default implementation push an event to the Gateway Service Manager.
+   *
+   * @param gatewayServiceManager the Gateway Service Manager
+   * @param event the event to push
+   */
+  default void onClientEvent(GatewayServiceManager gatewayServiceManager, GatewayServiceEvent event) {
+    gatewayServiceManager.newGatewayServiceEvent(event);
+  }
+
+  /**
+   * Start the processor.
+   */
+  public void start() throws IOException;
+
+  /**
+   * Stop the processor.
+   */
+  public void stop();
+
+
+
+  // TODO: remove in future change
+  /**
+   * Gateway service close connection with error. This function is called when manager wants to close client
+   * connection when there is an error. e.g. HelixManager connection is lost.
+   * @param instanceName  instance name
+   * @param reason  reason for closing connection
+   */
+  public void closeConnectionWithError(String instanceName, String reason);
+
+  /**
+   * Gateway service close client connection with success. This function is called when manager wants to close client
+   * connection gracefully, e.g., when gateway service is shutting down.
+   * @param instanceName  instance name
+   */
+  public void completeConnection(String instanceName);
 
 }

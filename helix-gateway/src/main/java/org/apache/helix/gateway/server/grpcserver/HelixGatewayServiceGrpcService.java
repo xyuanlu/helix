@@ -1,4 +1,4 @@
-package org.apache.helix.gateway.grpcservice;
+package org.apache.helix.gateway.server.grpcserver;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,15 +19,20 @@ package org.apache.helix.gateway.grpcservice;
  * under the License.
  */
 
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.gateway.service.GatewayServiceEvent;
 import org.apache.helix.gateway.service.GatewayServiceManager;
 import org.apache.helix.gateway.api.service.HelixGatewayServiceProcessor;
+import org.apache.helix.gateway.service.GatewayServiceProcessorConfig;
 import org.apache.helix.gateway.util.PerKeyLockRegistry;
 import org.apache.helix.gateway.util.StateTransitionMessageTranslateUtil;
 import org.apache.helix.model.Message;
@@ -50,6 +55,7 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
   // Map to store the observer for each instance
   private final Map<String, StreamObserver<TransitionMessage>> _observerMap = new HashMap<>();
   // A reverse map to store the instance name for each observer. It is used to find the instance when connection is closed.
+  // map<observer, pair<instance, cluster>>
   private final Map<StreamObserver<TransitionMessage>, Pair<String, String>> _reversedObserverMap = new HashMap<>();
 
   private final GatewayServiceManager _manager;
@@ -57,8 +63,11 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
   // A fine grain lock register on instance level
   private final PerKeyLockRegistry _lockRegistry;
 
-  public HelixGatewayServiceGrpcService(GatewayServiceManager manager) {
+  private final GatewayServiceProcessorConfig _config;
+
+  public HelixGatewayServiceGrpcService(GatewayServiceManager manager, GatewayServiceProcessorConfig config) {
     _manager = manager;
+    _config = config;
     _lockRegistry = new PerKeyLockRegistry();
   }
 
@@ -82,19 +91,22 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
           ShardState shardState = request.getShardState();
           updateObserver(shardState.getInstanceName(), shardState.getClusterName(), responseObserver);
         }
-        _manager.newGatewayServiceEvent(StateTransitionMessageTranslateUtil.translateShardStateMessageToEvent(request));
+        onClientEvent(_manager,
+            StateTransitionMessageTranslateUtil.translateShardStateMessageToEvent(request));
       }
 
       @Override
       public void onError(Throwable t) {
-        logger.info("Receive on error message: {}", t.getMessage());
-        onClientClose(responseObserver);
+        logger.info("Receive on error, reason: {} message: {}", Status.fromThrowable(t).getCode(), t.getMessage());
+        Pair<String, String> instanceInfo = _reversedObserverMap.get(responseObserver);
+        onClientClose(instanceInfo.getRight(), instanceInfo.getLeft());
       }
 
       @Override
       public void onCompleted() {
         logger.info("Receive on complete message");
-        onClientClose(responseObserver);
+        Pair<String, String> instanceInfo = _reversedObserverMap.get(responseObserver);
+        onClientClose(instanceInfo.getRight(), instanceInfo.getLeft());
       }
     };
   }
@@ -108,13 +120,11 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
    * @param message the message to convert to the transition message
    */
   @Override
-  public void sendStateTransitionMessage(String instanceName, String currentState,
-      Message message) {
+  public void sendStateTransitionMessage(String instanceName, String currentState, Message message) {
     StreamObserver<TransitionMessage> observer;
     observer = _observerMap.get(instanceName);
     if (observer != null) {
-      observer.onNext(
-          StateTransitionMessageTranslateUtil.translateSTMsgToTransitionMessage(message));
+      observer.onNext(StateTransitionMessageTranslateUtil.translateSTMsgToTransitionMessage(message));
     }
   }
 
@@ -125,7 +135,7 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
    */
   @Override
   public void closeConnectionWithError(String instanceName, String errorReason) {
-    logger.info("Close connection for instance: {} with error reason: {}", instanceName,  errorReason);
+    logger.info("Close connection for instance: {} with error reason: {}", instanceName, errorReason);
     closeConnectionHelper(instanceName, errorReason, true);
   }
 
@@ -139,7 +149,6 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
     closeConnectionHelper(instanceName, null, false);
   }
 
-
   private void closeConnectionHelper(String instanceName, String errorReason, boolean withError) {
     StreamObserver<TransitionMessage> observer;
     observer = _observerMap.get(instanceName);
@@ -152,6 +161,23 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
     }
   }
 
+  @Override
+  public void onClientClose(String clusterName, String instanceName) {
+    if (instanceName == null || clusterName == null) {
+      // TODO: log error;
+      return;
+    }
+    logger.info("Client close connection for instance: {}", instanceName);
+    GatewayServiceEvent event =
+        StateTransitionMessageTranslateUtil.translateClientCloseToEvent(clusterName, instanceName);
+    onClientEvent(_manager, event);
+    _lockRegistry.withLock(instanceName, () -> {
+      _reversedObserverMap.remove(_observerMap.get(instanceName));
+      _observerMap.remove(instanceName);
+      _lockRegistry.removeLock(instanceName);
+    });
+  }
+
   private void updateObserver(String instanceName, String clusterName,
       StreamObserver<TransitionMessage> streamObserver) {
     _lockRegistry.withLock(instanceName, () -> {
@@ -160,26 +186,23 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
     });
   }
 
-  private void onClientClose(
-      StreamObserver<proto.org.apache.helix.gateway.HelixGatewayServiceOuterClass.TransitionMessage> responseObserver) {
-    String instanceName;
-    String clusterName;
-    Pair<String, String> instanceInfo = _reversedObserverMap.get(responseObserver);
-    clusterName = instanceInfo.getRight();
-    instanceName = instanceInfo.getLeft();
-    logger.info("Client close connection for instance: {}", instanceName);
+  @Override
+  public void start() throws IOException {
+    ServerBuilder serverBuilder = ServerBuilder.forPort(_config.getGrpcServerPort())
+        .addService(this)
+        .keepAliveTime(_config.getServerHeartBeatInterval(),
+            TimeUnit.SECONDS)  // HeartBeat time
+        .keepAliveTimeout(_config.getClientTimeout(),
+            TimeUnit.SECONDS)  // KeepAlive client timeout
+        .permitKeepAliveTime(_config.getMaxAllowedClientHeartBeatInterval(),
+            TimeUnit.SECONDS)  // Permit min HeartBeat time
+        .permitKeepAliveWithoutCalls(true);  // Allow KeepAlive forever without active RPCs
+    Server server = serverBuilder.build();
+    server.start();
+  }
 
-    if (instanceName == null || clusterName == null) {
-      // TODO: log error;
-      return;
-    }
-    GatewayServiceEvent event =
-        StateTransitionMessageTranslateUtil.translateClientCloseToEvent(clusterName, instanceName);
-    _manager.newGatewayServiceEvent(event);
-    _lockRegistry.withLock(instanceName, () -> {
-      _reversedObserverMap.remove(responseObserver);
-      _observerMap.remove(instanceName);
-      _lockRegistry.removeLock(instanceName);
-    });
+  @Override
+  public void stop() {
+
   }
 }

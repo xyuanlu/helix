@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.gateway.base.HelixGatewayTestBase;
 import org.apache.helix.gateway.base.util.TestHelper;
 import org.apache.helix.gateway.constant.GatewayServiceEventType;
-import org.apache.helix.gateway.util.HelixGatewayGrpcServerBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import proto.org.apache.helix.gateway.HelixGatewayServiceGrpc;

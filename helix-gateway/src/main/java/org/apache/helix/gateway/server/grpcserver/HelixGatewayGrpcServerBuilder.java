@@ -1,4 +1,4 @@
-package org.apache.helix.gateway.util;
+package org.apache.helix.gateway.server.grpcserver;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
