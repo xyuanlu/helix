@@ -19,6 +19,7 @@ package org.apache.helix.gateway.channel;
  * under the License.
  */
 
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -31,8 +32,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.gateway.service.GatewayServiceEvent;
 import org.apache.helix.gateway.service.GatewayServiceManager;
-import org.apache.helix.gateway.api.service.HelixGatewayServiceProcessor;
-import org.apache.helix.gateway.service.GatewayServiceProcessorConfig;
 import org.apache.helix.gateway.api.service.HelixGatewayServiceChannel;
 import org.apache.helix.gateway.util.PerKeyLockRegistry;
 import org.apache.helix.gateway.util.StateTransitionMessageTranslateUtil;
@@ -64,9 +63,11 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
   // A fine grain lock register on instance level
   private final PerKeyLockRegistry _lockRegistry;
 
-  private final GatewayServiceProcessorConfig _config;
+  private final GatewayServiceChannelConfig _config;
 
-  public HelixGatewayServiceGrpcService(GatewayServiceManager manager, GatewayServiceProcessorConfig config) {
+  private Server _server;
+
+  public HelixGatewayServiceGrpcService(GatewayServiceManager manager, GatewayServiceChannelConfig config) {
     _manager = manager;
     _config = config;
     _lockRegistry = new PerKeyLockRegistry();
@@ -197,12 +198,22 @@ public class HelixGatewayServiceGrpcService extends HelixGatewayServiceGrpc.Heli
         .permitKeepAliveTime(_config.getMaxAllowedClientHeartBeatInterval(),
             TimeUnit.SECONDS)  // Permit min HeartBeat time
         .permitKeepAliveWithoutCalls(true);  // Allow KeepAlive forever without active RPCs
-    Server server = serverBuilder.build();
-    server.start();
+    _server = serverBuilder.build();
+
+    logger.info("Starting grpc server now....");
+    _server.start();
   }
 
   @Override
   public void stop() {
+    if (_server != null) {
+      logger.info("Shutting down grpc server now....");
+      _server.shutdownNow();
+    }
+  }
 
+  @VisibleForTesting
+  Server getServer() {
+    return _server;
   }
 }

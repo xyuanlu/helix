@@ -21,13 +21,12 @@ package org.apache.helix.gateway.service;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.Server;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.gateway.base.HelixGatewayTestBase;
-import org.apache.helix.gateway.base.util.TestHelper;
+import org.apache.helix.gateway.channel.GatewayServiceChannelConfig;
 import org.apache.helix.gateway.constant.GatewayServiceEventType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -43,8 +42,10 @@ public class TestGatewayServiceConnection extends HelixGatewayTestBase {
   @Test
   public void TestLivenessDetection() throws IOException, InterruptedException {
     // start the gateway service
-    Server server = TestHelper.createHelixGatewayServer(50051, new DummyGatewayServiceManager());
-    server.start();
+    GatewayServiceChannelConfig config =
+        new GatewayServiceChannelConfig.GatewayServiceProcessorConfigBuilder().setGrpcServerPort(50051).build();
+    GatewayServiceManager mng = new DummyGatewayServiceManager(config);
+    mng.startService();
 
     // start the client
     HelixGatewayClient client = new HelixGatewayClient("localhost", 50051);
@@ -132,8 +133,8 @@ public class TestGatewayServiceConnection extends HelixGatewayTestBase {
 
   class DummyGatewayServiceManager extends GatewayServiceManager {
 
-    public DummyGatewayServiceManager() {
-      super();
+    public DummyGatewayServiceManager(GatewayServiceChannelConfig gatewayServiceChannelConfig) {
+      super("dummyZkAddress", gatewayServiceChannelConfig);
     }
 
     @Override

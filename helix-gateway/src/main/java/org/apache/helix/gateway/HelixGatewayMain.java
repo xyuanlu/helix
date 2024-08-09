@@ -20,10 +20,8 @@ package org.apache.helix.gateway;
  */
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.gateway.channel.HelixGatewayServiceGrpcService;
 import org.apache.helix.gateway.service.GatewayServiceManager;
-import org.apache.helix.gateway.service.GatewayServiceProcessorConfig;
+import org.apache.helix.gateway.channel.GatewayServiceChannelConfig;
 
 
 /**
@@ -37,7 +35,7 @@ public final class HelixGatewayMain {
 
   public static void main(String[] args) throws InterruptedException, IOException {
     // Create a new server to listen on port 50051
-    GatewayServiceProcessorConfig.GatewayServiceProcessorConfigBuilder builder = new GatewayServiceProcessorConfig.GatewayServiceProcessorConfigBuilder();
+    GatewayServiceChannelConfig.GatewayServiceProcessorConfigBuilder builder = new GatewayServiceChannelConfig.GatewayServiceProcessorConfigBuilder();
     GatewayServiceManager manager = new GatewayServiceManager(args[0],
         builder.setGrpcServerPort(50051).build());
 
@@ -45,7 +43,6 @@ public final class HelixGatewayMain {
 
 
     // Wait for the server to shutdown
-    server.awaitTermination(365, TimeUnit.DAYS);
   }
 }
 

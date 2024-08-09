@@ -19,8 +19,6 @@ package org.apache.helix.gateway.service;
  * under the License.
  */
 
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -29,12 +27,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.google.common.collect.ImmutableSet;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.gateway.api.service.HelixGatewayServiceProcessor;
+import org.apache.helix.gateway.channel.GatewayServiceChannelConfig;
+import org.apache.helix.gateway.channel.HelixGatewayServiceChannelFactory;
 import org.apache.helix.gateway.constant.GatewayServiceEventType;
 import org.apache.helix.gateway.api.service.HelixGatewayServiceChannel;
-import org.apache.helix.gateway.constant.GatewayServiceEventType;
-import org.apache.helix.gateway.channel.HelixGatewayServiceGrpcService;
 import org.apache.helix.gateway.participant.HelixGatewayParticipant;
 import org.apache.helix.gateway.util.PerKeyBlockingExecutor;
 
@@ -63,16 +59,16 @@ public class GatewayServiceManager {
   // It is used to ensure for each instance, the connect/disconnect event won't start until the previous one is done.
   private final PerKeyBlockingExecutor _connectionEventProcessor;
 
-  private final GatewayServiceProcessorConfig _gatewayServiceProcessorConfig;
+  private final GatewayServiceChannelConfig _gatewayServiceChannelConfig;
 
-  public GatewayServiceManager(String zkAddress, GatewayServiceProcessorConfig gatewayServiceProcessorConfig) {
+  public GatewayServiceManager(String zkAddress, GatewayServiceChannelConfig gatewayServiceChannelConfig) {
     _helixGatewayParticipantMap = new ConcurrentHashMap<>();
     _zkAddress = zkAddress;
     _participantStateTransitionResultUpdator = Executors.newSingleThreadExecutor();
-    _gatewayServiceChannel = HelixGatewayServiceProcessorFactory.createProcessor(gatewayServiceProcessorConfig, this);
+    _gatewayServiceChannel = HelixGatewayServiceChannelFactory.createServiceChannel(gatewayServiceChannelConfig, this);
     _connectionEventProcessor =
         new PerKeyBlockingExecutor(CONNECTION_EVENT_THREAD_POOL_SIZE); // todo: make it configurable
-    _gatewayServiceProcessorConfig = gatewayServiceProcessorConfig;
+    _gatewayServiceChannelConfig = gatewayServiceChannelConfig;
   }
 
   /**
@@ -136,12 +132,9 @@ public class GatewayServiceManager {
     }
   }
 
-  public HelixGatewayServiceChannel getHelixGatewayServiceProcessor() {
-    return _gatewayServiceChannel;
-  }
 
   public void startService() throws IOException {
-    _gatewayServiceProcessor.start();
+    _gatewayServiceChannel.start();
   }
 
   private void createHelixGatewayParticipant(String clusterName, String instanceName,
