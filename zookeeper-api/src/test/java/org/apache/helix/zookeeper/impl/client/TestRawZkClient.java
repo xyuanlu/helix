@@ -528,6 +528,7 @@ public class TestRawZkClient extends ZkTestBase {
 
     // Test data change count
     final Lock lock = new ReentrantLock();
+
     final Condition callbackFinish = lock.newCondition();
     zkClient.subscribeDataChanges(TEST_PATH, new IZkDataListener() {
       @Override
